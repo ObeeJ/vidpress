@@ -9,77 +9,81 @@ export default function UrlDownloader() {
   const [audioOnly, setAudioOnly] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function submit() {
     if (!url.trim()) return;
-    setLoading(true); setError(null); setJobId(null); setStatus(null);
+    setLoading(true); setJobId(null); setStatus(null);
     try {
       const r = await fetch(`${API}/download-url`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ url, audio_only: audioOnly }),
       });
-      if (!r.ok) { const e = await r.json(); throw new Error(e.error); }
-      const { job_id } = await r.json();
-      setJobId(job_id); setStatus("queued");
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error);
+      setJobId(data.job_id); setStatus("queued");
       toast("Download started", "info");
       const poll = setInterval(async () => {
-        const jr = await fetch(`${API}/jobs/${job_id}`);
+        const jr = await fetch(`${API}/jobs/${data.job_id}`);
         const job = await jr.json();
         setStatus(job.status);
-        if (job.status === "done") { clearInterval(poll); toast("Download ready!", "success"); }
+        if (job.status === "done") { clearInterval(poll); toast("Ready to play!", "success"); }
         if (job.status === "failed") { clearInterval(poll); toast("Download failed", "error"); }
       }, 1500);
     } catch (e: unknown) {
-      setError(String(e));
       toast(String(e), "error");
     } finally {
       setLoading(false);
     }
   }
 
-  const PLATFORMS = ["YouTube", "Instagram", "TikTok", "X (Twitter)", "Facebook"];
-
   return (
     <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "20px", display: "flex", flexDirection: "column", gap: 14 }}>
       <div>
         <p style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>Download from a link</p>
-        <p style={{ fontSize: 12, color: "var(--muted)" }}>
-          Paste a link from {PLATFORMS.join(", ")}
-        </p>
+        <p style={{ fontSize: 12, color: "var(--muted)" }}>YouTube · Instagram · TikTok · X (Twitter) · Facebook</p>
       </div>
 
-      <input
-        value={url} onChange={(e) => setUrl(e.target.value)}
-        placeholder="https://youtube.com/watch?v=..."
-        style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text)", fontSize: 13, outline: "none" }}
-      />
+      <input value={url} onChange={(e) => setUrl(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && submit()}
+        placeholder="https://youtu.be/..."
+        style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text)", fontSize: 13, outline: "none" }} />
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
-          <input type="checkbox" checked={audioOnly} onChange={(e) => setAudioOnly(e.target.checked)}
-            style={{ accentColor: "var(--accent)", width: 16, height: 16 }} />
-          Audio only (MP3)
-        </label>
-        <span style={{ fontSize: 12, color: "var(--muted)" }}>— extract just the sound</span>
-      </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+        <input type="checkbox" checked={audioOnly} onChange={(e) => setAudioOnly(e.target.checked)}
+          style={{ accentColor: "var(--accent)", width: 16, height: 16 }} />
+        Audio only (MP3) — extract just the sound
+      </label>
 
-      {error && <p style={{ fontSize: 12, color: "var(--red)", background: "#ef444411", padding: "8px 12px", borderRadius: 8 }}>{error}</p>}
-
-      {status && (
-        <div style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ color: status === "done" ? "var(--green)" : status === "failed" ? "var(--red)" : "var(--accent)" }}>
-            {status === "done" ? "Done!" : status === "failed" ? "Failed" : `${status}…`}
-          </span>
-          {status === "done" && jobId && (
-            <a href={`/download/${jobId}`} download
-              style={{ padding: "6px 14px", borderRadius: 8, background: "var(--green)", color: "#fff", fontSize: 12, fontWeight: 700, textDecoration: "none" }}>
-              Download
-            </a>
-          )}
+      {/* Progress */}
+      {status && status !== "done" && status !== "failed" && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--accent)" }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", animation: "pulse 1s infinite" }} />
+          {status}…
         </div>
+      )}
+
+      {/* Preview + download when done */}
+      {status === "done" && jobId && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ borderRadius: 12, overflow: "hidden", background: "#000" }}>
+            {audioOnly
+              ? <audio src={`/download/${jobId}`} controls style={{ width: "100%", padding: "12px", display: "block" }} />
+              : <video src={`/download/${jobId}`} controls playsInline style={{ width: "100%", maxHeight: 300, display: "block" }} />
+            }
+          </div>
+          <a href={`/download/${jobId}`} download
+            style={{ display: "block", padding: "11px", borderRadius: 10, background: "var(--green)", color: "#fff", fontSize: 13, fontWeight: 700, textDecoration: "none", textAlign: "center" }}>
+            Download {audioOnly ? "MP3" : "MP4"}
+          </a>
+        </div>
+      )}
+
+      {status === "failed" && (
+        <p style={{ fontSize: 12, color: "var(--red)", background: "#ef444411", padding: "8px 12px", borderRadius: 8 }}>
+          Download failed. Check the URL and try again.
+        </p>
       )}
 
       <button onClick={submit} disabled={loading || !url.trim()}
@@ -87,9 +91,7 @@ export default function UrlDownloader() {
         {loading ? "Starting…" : audioOnly ? "Extract audio" : "Download video"}
       </button>
 
-      <p style={{ fontSize: 11, color: "var(--muted)" }}>
-        Requires Premium API key · <a href="/pricing" style={{ color: "var(--accent)" }}>Get one free</a>
-      </p>
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}`}</style>
     </div>
   );
 }
