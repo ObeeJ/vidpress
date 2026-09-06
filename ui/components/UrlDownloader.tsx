@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { toast } from "@/lib/toast";
 
 const API = "http://localhost:8080";
 
@@ -22,17 +23,18 @@ export default function UrlDownloader() {
       });
       if (!r.ok) { const e = await r.json(); throw new Error(e.error); }
       const { job_id } = await r.json();
-      setJobId(job_id);
-      setStatus("queued");
-      // Poll
+      setJobId(job_id); setStatus("queued");
+      toast("Download started", "info");
       const poll = setInterval(async () => {
         const jr = await fetch(`${API}/jobs/${job_id}`);
         const job = await jr.json();
         setStatus(job.status);
-        if (job.status === "done" || job.status === "failed") clearInterval(poll);
+        if (job.status === "done") { clearInterval(poll); toast("Download ready!", "success"); }
+        if (job.status === "failed") { clearInterval(poll); toast("Download failed", "error"); }
       }, 1500);
     } catch (e: unknown) {
       setError(String(e));
+      toast(String(e), "error");
     } finally {
       setLoading(false);
     }

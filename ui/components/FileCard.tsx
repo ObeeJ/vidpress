@@ -4,6 +4,7 @@ import { useStore, FileItem } from "@/lib/store";
 import { ingestFile, analyzeFile, uploadFile, getJob } from "@/lib/api";
 import { QRCodeSVG } from "qrcode.react";
 import { Tooltip } from "@/app/page";
+import { toast } from "@/lib/toast";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 
@@ -63,7 +64,7 @@ export default function FileCard({ item }: { item: FileItem }) {
     ingestFile(item.file, (pct) => setUploadPct(item.localUrl, pct))
       .then((path) => { setServerPath(item.localUrl, path); return analyzeFile(path); })
       .then((p) => setProfile(item.localUrl, p))
-      .catch((e) => setError(item.localUrl, `Upload failed: ${e}`));
+      .catch((e) => { setError(item.localUrl, `Upload failed: ${e}`); toast(`Upload failed: ${e}`, "error"); });
   }, []);
 
   // Poll job status
@@ -76,11 +77,10 @@ export default function FileCard({ item }: { item: FileItem }) {
         clearInterval(pollRef.current!);
         // Browser notification
         if (job.status === "done" && Notification.permission === "granted") {
-          new Notification("Compression done!", {
-            body: `${item.file.name} is ready to download`,
-            icon: "/favicon.ico",
-          });
+          new Notification("Compression done!", { body: `${item.file.name} is ready to download`, icon: "/favicon.ico" });
+          toast(`${item.file.name} compressed successfully`, "success");
         }
+        if (job.status === "failed") toast(`Compression failed for ${item.file.name}`, "error");
       }
     }, 800);
     return () => clearInterval(pollRef.current!);
@@ -113,15 +113,12 @@ export default function FileCard({ item }: { item: FileItem }) {
   async function compress() {
     if (!item.serverPath) return;
     try {
-      const { job_id } = await uploadFile(
-        item.serverPath,
-        selectedPreset === "original" ? undefined : selectedPreset,
-        undefined,
-        selectedFormat !== profile?.output_ext ? selectedFormat : undefined,
-      );
+      const { job_id } = await uploadFile(item.serverPath, selectedPreset === "original" ? undefined : selectedPreset, undefined, selectedFormat !== profile?.output_ext ? selectedFormat : undefined);
       setJobId(item.localUrl, job_id);
+      toast("Compression started", "info");
     } catch (e) {
       setError(item.localUrl, String(e));
+      toast(String(e), "error");
     }
   }
 
