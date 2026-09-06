@@ -1,1 +1,6 @@
 /target
+ui/node_modules
+ui/.next
+ui/.env.local
+*.db
+*.log
