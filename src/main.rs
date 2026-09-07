@@ -147,17 +147,17 @@ fn auth_and_rate(req: &Request, db: &Db) -> Result<Option<ApiKey>, Response> {
                     _ => 60, // free
                 };
                 if !rate_check(db, &k, limit) {
-                    return Err(Response { status: 429, body: r#"{"error":"rate limit exceeded"}"#.into() });
+                    return Err(Response { status: 429, body: r#"{"error":"rate limit exceeded"}"#.into(), ..Default::default() });
                 }
                 Ok(Some(ak))
             }
-            None => Err(Response { status: 401, body: r#"{"error":"invalid api key"}"#.into() }),
+            None => Err(Response { status: 401, body: r#"{"error":"invalid api key"}"#.into(), ..Default::default() }),
         }
     } else {
         // Anonymous — 10 req/min per IP
         let ip = extract_ip(req);
         if !rate_check(db, &ip, 10) {
-            return Err(Response { status: 429, body: r#"{"error":"rate limit exceeded — get an API key for higher limits"}"#.into() });
+            return Err(Response { status: 429, body: r#"{"error":"rate limit exceeded — get an API key for higher limits"}"#.into(), ..Default::default() });
         }
         Ok(None)
     }
@@ -473,11 +473,11 @@ async fn ingest(req: Request) -> Response {
     let uid = Uuid::new_v4().to_string()[..8].to_string();
     let path = format!("/tmp/vidpress_{}_{}", uid, name);
     if let Err(e) = tokio::fs::write(&path, &req.body).await {
-        return Response { status: 500, body: format!(r#"{{"error":"{e}"}}"#) };
+        return Response { status: 500, body: format!(r#"{{"error":"{e}"}}"#) , ..Default::default() };
     }
     // Remux .mov/.avi/.mkv → .mp4 for universal browser/Cloudflare compatibility
     let path = remux_to_mp4_if_needed(&path).await;
-    Response { status: 200, body: format!(r#"{{"path":"{path}"}}"#) }
+    Response { status: 200, body: format!(r#"{{"path":"{path}"}}"#) , ..Default::default() }
 }
 
 /// POST /analyze — { path } → MediaProfile
@@ -485,8 +485,8 @@ async fn ingest(req: Request) -> Response {
 async fn analyze(req: Request) -> Response {
     let path = match extract_path(&req) { Ok(p) => p, Err(r) => return r };
     match detect(&path).await {
-        Ok(profile) => Response { status: 200, body: serde_json::to_string(&profile).unwrap() },
-        Err(e) => Response { status: 415, body: format!(r#"{{"error":"{e}"}}"#) },
+        Ok(profile) => Response { status: 200, body: serde_json::to_string(&profile).unwrap(), ..Default::default() },
+        Err(e) => Response { status: 415, body: format!(r#"{{"error":"{e}"}}"#), ..Default::default() },
     }
 }
 
@@ -496,11 +496,11 @@ async fn upload(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
     let body: serde_json::Value = match serde_json::from_slice(&req.body) {
         Ok(v) => v,
-        Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into() },
+        Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into(), ..Default::default() },
     };
     let path = match body["path"].as_str() {
         Some(p) => p.to_string(),
-        None => return Response { status: 400, body: r#"{"error":"missing path"}"#.into() },
+        None => return Response { status: 400, body: r#"{"error":"missing path"}"#.into(), ..Default::default() },
     };
     let webhook_url = body["webhook_url"].as_str().map(String::from);
     let preset = body["preset"].as_str().map(String::from);
@@ -508,7 +508,7 @@ async fn upload(req: Request) -> Response {
 
     let mut profile = match detect(&path).await {
         Ok(p) => p,
-        Err(e) => return Response { status: 415, body: format!(r#"{{"error":"{e}"}}"#) },
+        Err(e) => return Response { status: 415, body: format!(r#"{{"error":"{e}"}}"#), ..Default::default() },
     };
     // Override output format if user specified one
     if let Some(ref fmt) = output_format {
@@ -546,6 +546,7 @@ async fn upload(req: Request) -> Response {
     Response {
         status: 202,
         body: format!(r#"{{"job_id":"{id}","status":"queued","estimated_time_secs":{eta}}}"#),
+        ..Default::default()
     }
 }
 
@@ -558,8 +559,29 @@ async fn get_job(req: Request) -> Response {
     let job = state.jobs.lock().unwrap().get(&id).cloned()
         .or_else(|| db_get_job(&state.db, &id));
     match job {
-        Some(j) => Response { status: 200, body: serde_json::to_string(&j).unwrap() },
-        None => Response { status: 404, body: r#"{"error":"job not found"}"#.into() },
+        Some(j) => Response { status: 200, body: serde_json::to_string(&j).unwrap(), ..Default::default() },
+        None => Response { status: 404, body: r#"{"error":"job not found"}"#.into(), ..Default::default() },
+    }
+}
+
+/// Guess a Content-Type for a job's output file from its extension.
+fn content_type_for(output_path: &str) -> &'static str {
+    match std::path::Path::new(output_path).extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase().as_str() {
+        "mp4" | "m4v" => "video/mp4",
+        "mov" => "video/quicktime",
+        "mkv" => "video/x-matroska",
+        "webm" => "video/webm",
+        "avi" => "video/x-msvideo",
+        "gif" => "image/gif",
+        "mp3" => "audio/mpeg",
+        "m4a" => "audio/mp4",
+        "ogg" => "audio/ogg",
+        "flac" => "audio/flac",
+        "wav" => "audio/wav",
+        "jpg" | "jpeg" => "image/jpeg",
+        "png" => "image/png",
+        "webp" => "image/webp",
+        _ => "application/octet-stream",
     }
 }
 
@@ -573,19 +595,21 @@ async fn download(req: Request) -> Response {
     match job {
         Some(j) if matches!(j.status, JobStatus::Done) => {
             match std::fs::read(&j.output_path) {
-                Ok(bytes) => Response { status: 200, body: String::from_utf8_lossy(&bytes).into_owned() },
-                Err(_) => Response { status: 404, body: r#"{"error":"output file missing"}"#.into() },
+                // Raw bytes, not routed through String — String::from_utf8_lossy
+                // here would silently corrupt any binary output (see glideapi#1).
+                Ok(bytes) => Response::binary(200, bytes, content_type_for(&j.output_path)),
+                Err(_) => Response { status: 404, body: r#"{"error":"output file missing"}"#.into(), ..Default::default() },
             }
         }
-        Some(_) => Response { status: 409, body: r#"{"error":"job not done yet"}"#.into() },
-        None => Response { status: 404, body: r#"{"error":"job not found"}"#.into() },
+        Some(_) => Response { status: 409, body: r#"{"error":"job not done yet"}"#.into(), ..Default::default() },
+        None => Response { status: 404, body: r#"{"error":"job not found"}"#.into(), ..Default::default() },
     }
 }
 
 /// GET /health
 #[get("/health")]
 async fn health(_req: Request) -> Response {
-    Response { status: 200, body: r#"{"ok":true}"#.into() }
+    Response { status: 200, body: r#"{"ok":true}"#.into(), ..Default::default() }
 }
 
 /// POST /keys — create API key { name, plan, webhook_url?, white_label_domain?, white_label_brand? }
@@ -593,7 +617,7 @@ async fn health(_req: Request) -> Response {
 async fn create_key(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
     let body: serde_json::Value = match serde_json::from_slice(&req.body) {
-        Ok(v) => v, Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into() },
+        Ok(v) => v, Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into(), ..Default::default() },
     };
     let name = body["name"].as_str().unwrap_or("unnamed").to_string();
     let plan = match body["plan"].as_str() {
@@ -616,7 +640,7 @@ async fn create_key(req: Request) -> Response {
             params![domain], |r| r.get::<_, i64>(0)
         ).unwrap_or(0) > 0;
         if exists {
-            return Response { status: 409, body: r#"{"error":"white-label domain already taken"}"#.into() };
+            return Response { status: 409, body: r#"{"error":"white-label domain already taken"}"#.into(), ..Default::default() };
         }
     }
 
@@ -628,7 +652,7 @@ async fn create_key(req: Request) -> Response {
             params![key, name, plan, webhook_url, wl_domain, wl_brand]
         ).ok();
     }
-    Response { status: 201, body: serde_json::json!({ "key": key, "name": name, "plan": plan }).to_string() }
+    Response { status: 201, body: serde_json::json!({ "key": key, "name": name, "plan": plan }).to_string() , ..Default::default() }
 }
 
 /// POST /download-url — { url, audio_only?, output_format? } — download from YouTube/IG/X/TikTok
@@ -638,11 +662,11 @@ async fn download_url(req: Request) -> Response {
     if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
 
     let body: serde_json::Value = match serde_json::from_slice(&req.body) {
-        Ok(v) => v, Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into() },
+        Ok(v) => v, Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into(), ..Default::default() },
     };
     let url = match body["url"].as_str() {
         Some(u) => u.to_string(),
-        None => return Response { status: 400, body: r#"{"error":"missing url"}"#.into() },
+        None => return Response { status: 400, body: r#"{"error":"missing url"}"#.into(), ..Default::default() },
     };
     let audio_only = body["audio_only"].as_bool().unwrap_or(false);
     let webhook_url = body["webhook_url"].as_str().map(String::from);
@@ -670,7 +694,7 @@ async fn download_url(req: Request) -> Response {
         run_yt_dlp(id_clone, url, output_path, audio_only, jobs, db).await;
     });
 
-    Response { status: 202, body: serde_json::json!({ "job_id": id, "status": "queued" }).to_string() }
+    Response { status: 202, body: serde_json::json!({ "job_id": id, "status": "queued" }).to_string() , ..Default::default() }
 }
 
 /// POST /transcribe — { job_id } or { path } — transcribe audio/video
@@ -682,7 +706,7 @@ async fn transcribe(req: Request) -> Response {
     let model = if is_premium { "medium" } else { "base" };
 
     let body: serde_json::Value = match serde_json::from_slice(&req.body) {
-        Ok(v) => v, Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into() },
+        Ok(v) => v, Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into(), ..Default::default() },
     };
 
     let path = if let Some(jid) = body["job_id"].as_str() {
@@ -690,13 +714,13 @@ async fn transcribe(req: Request) -> Response {
             .or_else(|| db_get_job(&state.db, jid));
         match job {
             Some(j) if matches!(j.status, JobStatus::Done) => j.output_path,
-            Some(_) => return Response { status: 409, body: r#"{"error":"job not done yet"}"#.into() },
-            None => return Response { status: 404, body: r#"{"error":"job not found"}"#.into() },
+            Some(_) => return Response { status: 409, body: r#"{"error":"job not done yet"}"#.into(), ..Default::default() },
+            None => return Response { status: 404, body: r#"{"error":"job not found"}"#.into(), ..Default::default() },
         }
     } else if let Some(p) = body["path"].as_str() {
         p.to_string()
     } else {
-        return Response { status: 400, body: r#"{"error":"provide job_id or path"}"#.into() };
+        return Response { status: 400, body: r#"{"error":"provide job_id or path"}"#.into(), ..Default::default() };
     };
 
     let tid = Uuid::new_v4().to_string();
@@ -723,9 +747,9 @@ async fn transcribe(req: Request) -> Response {
                 ).ok();
             }
             let _ = tokio::fs::rename(&whisper_out, &out_file).await;
-            Response { status: 200, body: serde_json::json!({ "id": tid, "text": text, "model": model }).to_string() }
+            Response { status: 200, body: serde_json::json!({ "id": tid, "text": text, "model": model }).to_string() , ..Default::default() }
         }
-        _ => Response { status: 500, body: r#"{"error":"transcription failed"}"#.into() },
+        _ => Response { status: 500, body: r#"{"error":"transcription failed"}"#.into(), ..Default::default() },
     }
 }
 
@@ -741,8 +765,8 @@ async fn get_transcription(req: Request) -> Response {
         |r| Ok(serde_json::json!({ "id": r.get::<_,String>(0)?, "job_id": r.get::<_,String>(1)?, "text": r.get::<_,String>(2)? }))
     );
     match result {
-        Ok(v) => Response { status: 200, body: v.to_string() },
-        Err(_) => Response { status: 404, body: r#"{"error":"not found"}"#.into() },
+        Ok(v) => Response { status: 200, body: v.to_string(), ..Default::default() },
+        Err(_) => Response { status: 404, body: r#"{"error":"not found"}"#.into(), ..Default::default() },
     }
 }
 
@@ -964,9 +988,25 @@ fn parse_us(content: &str) -> Option<u64> {
 
 fn extract_path(req: &Request) -> Result<String, Response> {
     let body: serde_json::Value = serde_json::from_slice(&req.body)
-        .map_err(|_| Response { status: 400, body: r#"{"error":"expected JSON with 'path' field"}"#.into() })?;
+        .map_err(|_| Response { status: 400, body: r#"{"error":"expected JSON with 'path' field"}"#.into(), ..Default::default() })?;
     body["path"].as_str().map(String::from)
-        .ok_or_else(|| Response { status: 400, body: r#"{"error":"missing 'path' field"}"#.into() })
+        .ok_or_else(|| Response { status: 400, body: r#"{"error":"missing 'path' field"}"#.into(), ..Default::default() })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::content_type_for;
+
+    #[test]
+    fn content_type_matches_extension() {
+        assert_eq!(content_type_for("/tmp/x_output.mp4"), "video/mp4");
+        assert_eq!(content_type_for("/tmp/x_output.mkv"), "video/x-matroska");
+        assert_eq!(content_type_for("/tmp/x_output.mp3"), "audio/mpeg");
+        assert_eq!(content_type_for("/tmp/x_output.flac"), "audio/flac");
+        assert_eq!(content_type_for("/tmp/x_output.png"), "image/png");
+        assert_eq!(content_type_for("/tmp/x_output.unknownext"), "application/octet-stream");
+        assert_eq!(content_type_for("/tmp/no_extension"), "application/octet-stream");
+    }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
