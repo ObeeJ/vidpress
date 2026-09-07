@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
+import { API_BASE_URL } from "@/lib/api";
 
 const PLANS = [
   {
@@ -66,14 +67,25 @@ export default function PricingPage() {
     if (!name.trim()) { setError("Enter a name for your key first"); return; }
     if (planId.startsWith("whitelabel") && !wlDomain.trim()) { setError("Enter your custom domain"); return; }
     setLoading(planId); setError(null);
-    const r = await fetch("http://localhost:8080/keys", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, plan: planId, white_label_domain: wlDomain || undefined, white_label_brand: wlBrand || undefined }),
-    });
-    const data = await r.json();
-    if (!r.ok) { setError(data.error); setLoading(null); return; }
-    setResult(data); setLoading(null);
+    try {
+      const r = await fetch(`${API_BASE_URL}/keys`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, plan: planId, white_label_domain: wlDomain || undefined, white_label_brand: wlBrand || undefined }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        console.error("[keys] failed:", data.error);
+        setError(r.status === 409 ? "That domain is already taken." : "Could not create your key. Please try again.");
+        setLoading(null);
+        return;
+      }
+      setResult(data); setLoading(null);
+    } catch (e) {
+      console.error("[keys] request failed:", e);
+      setError("Could not create your key. Please try again.");
+      setLoading(null);
+    }
   }
 
   function downloadPage() {

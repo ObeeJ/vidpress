@@ -1,6 +1,13 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
+import { toast } from "@/lib/toast";
+
+// Matches the backend's body_limit (see Config in src/main.rs). Checked
+// client-side purely for fast feedback — the backend enforces this
+// regardless, but without this check the browser would spend minutes
+// streaming a doomed upload before finding out it's rejected.
+const MAX_FILE_BYTES = 2 * 1024 * 1024 * 1024;
 
 export default function DropZone() {
   const addFiles = useStore((s) => s.addFiles);
@@ -10,7 +17,15 @@ export default function DropZone() {
 
   const handle = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;
-    addFiles(Array.from(files));
+    const accepted: File[] = [];
+    for (const file of Array.from(files)) {
+      if (file.size > MAX_FILE_BYTES) {
+        toast(`${file.name} is over the 2GB limit and was skipped`, "error");
+        continue;
+      }
+      accepted.push(file);
+    }
+    if (accepted.length > 0) addFiles(accepted);
   }, [addFiles]);
 
   useEffect(() => {
@@ -19,8 +34,10 @@ export default function DropZone() {
     if (detected && detected > 0) {
       setNetworkMbps(detected);
     } else {
+      // Same-origin ping (our own favicon) rather than a third-party host —
+      // avoids leaking the visitor's IP/UA to an external site on every load.
       const start = Date.now();
-      fetch("https://www.google.com/favicon.ico", { cache: "no-store", mode: "no-cors" })
+      fetch("/favicon.ico", { cache: "no-store" })
         .then(() => {
           const ms = Date.now() - start;
           const mbps = Math.round((1 / 1024 / (ms / 1000)) * 8 * 100) / 100;

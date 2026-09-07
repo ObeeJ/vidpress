@@ -64,7 +64,7 @@ export default function FileCard({ item }: { item: FileItem }) {
     ingestFile(item.file, (pct) => setUploadPct(item.localUrl, pct))
       .then((path) => { setServerPath(item.localUrl, path); return analyzeFile(path); })
       .then((p) => setProfile(item.localUrl, p))
-      .catch((e) => { setError(item.localUrl, `Upload failed: ${e}`); toast(`Upload failed: ${e}`, "error"); });
+      .catch((e) => { const msg = e instanceof Error ? e.message : "Upload failed"; setError(item.localUrl, msg); toast(msg, "error"); });
   }, []);
 
   // Poll job status
@@ -117,8 +117,9 @@ export default function FileCard({ item }: { item: FileItem }) {
       setJobId(item.localUrl, job_id);
       toast("Compression started", "info");
     } catch (e) {
-      setError(item.localUrl, String(e));
-      toast(String(e), "error");
+      const msg = e instanceof Error ? e.message : "Compression failed to start";
+      setError(item.localUrl, msg);
+      toast(msg, "error");
     }
   }
 

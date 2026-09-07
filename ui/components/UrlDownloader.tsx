@@ -1,8 +1,9 @@
 "use client";
 import { useState } from "react";
 import { toast } from "@/lib/toast";
+import { API_BASE_URL } from "@/lib/api";
 
-const API = "http://localhost:8080";
+const API = API_BASE_URL;
 
 export default function UrlDownloader() {
   const [url, setUrl] = useState("");
@@ -21,7 +22,10 @@ export default function UrlDownloader() {
         body: JSON.stringify({ url, audio_only: audioOnly }),
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error);
+      if (!r.ok) {
+        console.error("[download-url] failed:", data.error);
+        throw new Error("Download failed to start");
+      }
       setJobId(data.job_id); setStatus("queued");
       toast("Download started", "info");
       const poll = setInterval(async () => {
@@ -32,7 +36,7 @@ export default function UrlDownloader() {
         if (job.status === "failed") { clearInterval(poll); toast("Download failed", "error"); }
       }, 1500);
     } catch (e: unknown) {
-      toast(String(e), "error");
+      toast(e instanceof Error ? e.message : "Download failed to start", "error");
     } finally {
       setLoading(false);
     }
