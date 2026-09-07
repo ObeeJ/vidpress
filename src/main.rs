@@ -32,6 +32,25 @@ fn cors_origin() -> Option<String> {
     std::env::var("VIDPRESS_CORS_ORIGIN").ok().filter(|s| !s.is_empty())
 }
 
+/// /tmp is commonly cleared by systemd-tmpfiles or a reboot — fine for local
+/// dev, silent data loss (every job, api key, transcript, and output file)
+/// in production. A loud startup warning rather than a hard failure, since
+/// an ephemeral/test deployment may legitimately want this.
+fn warn_if_using_tmp_defaults() {
+    if std::env::var("VIDPRESS_STORAGE").is_err() {
+        tracing::warn!(
+            "VIDPRESS_STORAGE is not set — output files are written to {}, which is not durable storage. Set VIDPRESS_STORAGE to a persistent path in production.",
+            storage_dir()
+        );
+    }
+    if std::env::var("VIDPRESS_DB").is_err() {
+        tracing::warn!(
+            "VIDPRESS_DB is not set — the database lives at {}, which is not durable storage. Set VIDPRESS_DB to a persistent path in production.",
+            db_path()
+        );
+    }
+}
+
 /// Directory raw uploads land in via /ingest — deliberately not configurable
 /// (see ingest()), so path validation below can pin against it exactly.
 const INGEST_DIR: &str = "/tmp";
@@ -1173,7 +1192,16 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     let conn = Connection::open(db_path()).expect("cannot open db");
+    // WAL lets readers run concurrently with the single writer instead of
+    // serializing every read behind the same lock as writes — meaningful
+    // here since Db is a single Arc<Mutex<Connection>> shared by every
+    // request. busy_timeout makes a writer wait briefly under contention
+    // instead of immediately failing with SQLITE_BUSY.
+    conn.query_row("PRAGMA journal_mode=WAL", [], |row| row.get::<_, String>(0))
+        .expect("failed to enable WAL mode");
+    conn.busy_timeout(Duration::from_secs(5)).expect("failed to set busy_timeout");
     init_db(&conn);
+    warn_if_using_tmp_defaults();
 
     // Reload in-progress jobs from DB into memory on startup
     let mut jobs_map: HashMap<String, Job> = HashMap::new();
