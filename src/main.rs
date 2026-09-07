@@ -571,11 +571,11 @@ async fn ingest(req: Request) -> Response {
     let uid = Uuid::new_v4().to_string()[..8].to_string();
     let path = format!("{INGEST_DIR}/{INGEST_PREFIX}{uid}_{name}");
     if let Err(e) = tokio::fs::write(&path, &req.body).await {
-        return Response { status: 500, body: format!(r#"{{"error":"{e}"}}"#) , ..Default::default() };
+        return Response { status: 500, body: serde_json::json!({"error": e.to_string()}).to_string(), ..Default::default() };
     }
     // Remux .mov/.avi/.mkv → .mp4 for universal browser/Cloudflare compatibility
     let path = remux_to_mp4_if_needed(&path).await;
-    Response { status: 200, body: format!(r#"{{"path":"{path}"}}"#) , ..Default::default() }
+    Response { status: 200, body: serde_json::json!({"path": path}).to_string(), ..Default::default() }
 }
 
 /// POST /analyze — { path } → MediaProfile
@@ -586,7 +586,7 @@ async fn analyze(req: Request) -> Response {
     let path = match extract_path(&req) { Ok(p) => p, Err(r) => return r };
     match detect(&path).await {
         Ok(profile) => Response { status: 200, body: serde_json::to_string(&profile).unwrap(), ..Default::default() },
-        Err(e) => Response { status: 415, body: format!(r#"{{"error":"{e}"}}"#), ..Default::default() },
+        Err(e) => Response { status: 415, body: serde_json::json!({"error": e}).to_string(), ..Default::default() },
     }
 }
 
@@ -607,7 +607,7 @@ async fn upload(req: Request) -> Response {
     let webhook_url = body["webhook_url"].as_str().map(String::from);
     if let Some(ref wh) = webhook_url {
         if let Err(e) = validate_outbound_url(wh).await {
-            return Response { status: 400, body: format!(r#"{{"error":"invalid webhook_url: {e}"}}"#), ..Default::default() };
+            return Response { status: 400, body: serde_json::json!({"error": format!("invalid webhook_url: {e}")}).to_string(), ..Default::default() };
         }
     }
     let preset = body["preset"].as_str().map(String::from);
@@ -615,7 +615,7 @@ async fn upload(req: Request) -> Response {
 
     let mut profile = match detect(&path).await {
         Ok(p) => p,
-        Err(e) => return Response { status: 415, body: format!(r#"{{"error":"{e}"}}"#), ..Default::default() },
+        Err(e) => return Response { status: 415, body: serde_json::json!({"error": e}).to_string(), ..Default::default() },
     };
     // Override output format if user specified one
     if let Some(ref fmt) = output_format {
@@ -652,7 +652,7 @@ async fn upload(req: Request) -> Response {
 
     Response {
         status: 202,
-        body: format!(r#"{{"job_id":"{id}","status":"queued","estimated_time_secs":{eta}}}"#),
+        body: serde_json::json!({"job_id": id, "status": "queued", "estimated_time_secs": eta}).to_string(),
         ..Default::default()
     }
 }
@@ -742,7 +742,7 @@ async fn create_key(req: Request) -> Response {
     let webhook_url = body["webhook_url"].as_str().map(String::from);
     if let Some(ref wh) = webhook_url {
         if let Err(e) = validate_outbound_url(wh).await {
-            return Response { status: 400, body: format!(r#"{{"error":"invalid webhook_url: {e}"}}"#), ..Default::default() };
+            return Response { status: 400, body: serde_json::json!({"error": format!("invalid webhook_url: {e}")}).to_string(), ..Default::default() };
         }
     }
     let wl_domain = body["white_label_domain"].as_str().map(String::from);
@@ -785,13 +785,13 @@ async fn download_url(req: Request) -> Response {
         None => return Response { status: 400, body: r#"{"error":"missing url"}"#.into(), ..Default::default() },
     };
     if let Err(e) = validate_outbound_url(&url).await {
-        return Response { status: 400, body: format!(r#"{{"error":"invalid url: {e}"}}"#), ..Default::default() };
+        return Response { status: 400, body: serde_json::json!({"error": format!("invalid url: {e}")}).to_string(), ..Default::default() };
     }
     let audio_only = body["audio_only"].as_bool().unwrap_or(false);
     let webhook_url = body["webhook_url"].as_str().map(String::from);
     if let Some(ref wh) = webhook_url {
         if let Err(e) = validate_outbound_url(wh).await {
-            return Response { status: 400, body: format!(r#"{{"error":"invalid webhook_url: {e}"}}"#), ..Default::default() };
+            return Response { status: 400, body: serde_json::json!({"error": format!("invalid webhook_url: {e}")}).to_string(), ..Default::default() };
         }
     }
 
@@ -1171,6 +1171,18 @@ mod tests {
         assert!(validate_outbound_url("http://127.0.0.1/admin").await.is_err());
         assert!(validate_outbound_url("http://169.254.169.254/latest/meta-data/").await.is_err());
         assert!(validate_outbound_url("not a url at all").await.is_err());
+    }
+
+    #[test]
+    fn json_error_responses_stay_valid_json_with_quotes_in_the_value() {
+        // Regression guard for the manual `format!(r#"{{"error":"{e}"}}"#)`
+        // pattern this replaced, which broke (produced invalid JSON) the
+        // moment the interpolated value contained a `"`.
+        let value_with_quote = r#"path "weird" contains a quote"#;
+        let body = serde_json::json!({"error": value_with_quote}).to_string();
+        let parsed: serde_json::Value = serde_json::from_str(&body)
+            .expect("response body must be valid JSON even when the value contains a quote");
+        assert_eq!(parsed["error"], value_with_quote);
     }
 
     #[test]
