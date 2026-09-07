@@ -21,6 +21,70 @@ fn db_path() -> String {
     std::env::var("VIDPRESS_DB").unwrap_or_else(|_| "/tmp/vidpress.db".into())
 }
 
+/// Directory raw uploads land in via /ingest — deliberately not configurable
+/// (see ingest()), so path validation below can pin against it exactly.
+const INGEST_DIR: &str = "/tmp";
+const INGEST_PREFIX: &str = "vidpress_";
+
+/// Reject any client-supplied `path` that isn't a file we ourselves wrote via
+/// /ingest. Without this, /analyze and /upload would hand ffprobe/ffmpeg
+/// whatever path a caller sends — including protocol handlers like http://,
+/// concat:, or subfile: — turning them into an SSRF / arbitrary-local-file
+/// read primitive (feed /etc/passwd or an internal URL, then fetch the
+/// "compressed" result back via /download/:id).
+fn validate_ingest_path(raw: &str) -> Result<String, Response> {
+    let bad = || Response { status: 400, body: r#"{"error":"invalid path"}"#.into(), ..Default::default() };
+    let canonical = std::fs::canonicalize(raw).map_err(|_| bad())?;
+    let ingest_dir = std::fs::canonicalize(INGEST_DIR).map_err(|_| bad())?;
+    let file_name_ok = canonical.file_name()
+        .and_then(|n| n.to_str())
+        .map(|n| n.starts_with(INGEST_PREFIX))
+        .unwrap_or(false);
+    if !canonical.starts_with(&ingest_dir) || !file_name_ok {
+        return Err(bad());
+    }
+    Ok(canonical.to_string_lossy().into_owned())
+}
+
+/// Basic SSRF guard for user-supplied outbound URLs (webhook_url, and the
+/// `url` /download-url hands to yt-dlp). Restricts to http/https and rejects
+/// targets that resolve to loopback/private/link-local addresses — closes
+/// the easy path to internal services and cloud metadata endpoints (e.g.
+/// 169.254.169.254). Not a substitute for network-level egress controls,
+/// and doesn't defend against DNS rebinding after this check passes.
+async fn validate_outbound_url(raw: &str) -> Result<(), &'static str> {
+    let url = reqwest::Url::parse(raw).map_err(|_| "invalid url")?;
+    if url.scheme() != "http" && url.scheme() != "https" {
+        return Err("only http/https urls are allowed");
+    }
+    let host = url.host_str().ok_or("missing host")?;
+    let port = url.port_or_known_default().unwrap_or(443);
+    let mut addrs = tokio::net::lookup_host((host, port)).await
+        .map_err(|_| "could not resolve host")?
+        .peekable();
+    if addrs.peek().is_none() { return Err("could not resolve host"); }
+    for addr in addrs {
+        if is_disallowed_ip(&addr.ip()) {
+            return Err("url resolves to a disallowed address");
+        }
+    }
+    Ok(())
+}
+
+fn is_disallowed_ip(ip: &std::net::IpAddr) -> bool {
+    match ip {
+        std::net::IpAddr::V4(v4) => {
+            v4.is_loopback() || v4.is_private() || v4.is_link_local()
+                || v4.is_broadcast() || v4.is_documentation() || v4.is_unspecified()
+        }
+        std::net::IpAddr::V6(v6) => {
+            v6.is_loopback() || v6.is_unspecified()
+                || (v6.segments()[0] & 0xfe00) == 0xfc00 // unique local fc00::/7
+                || (v6.segments()[0] & 0xffc0) == 0xfe80 // link-local fe80::/10
+        }
+    }
+}
+
 // ── DB ────────────────────────────────────────────────────────────────────────
 
 fn init_db(conn: &Connection) {
@@ -285,7 +349,11 @@ struct MediaProfile {
 
 async fn detect(path: &str) -> Result<MediaProfile, String> {
     let out = Command::new("ffprobe")
-        .args(["-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", path])
+        // protocol_whitelist=file — even though `path` is validated to be a
+        // real local file before this is called, this stops ffprobe itself
+        // from following any http/concat/subfile/etc. reference the file's
+        // *contents* might embed (e.g. a crafted playlist/manifest).
+        .args(["-v", "quiet", "-protocol_whitelist", "file", "-print_format", "json", "-show_format", "-show_streams", path])
         .output().await.map_err(|e| e.to_string())?;
 
     let j: serde_json::Value = serde_json::from_slice(&out.stdout).map_err(|e| e.to_string())?;
@@ -471,7 +539,7 @@ async fn ingest(req: Request) -> Response {
         .file_name().and_then(|n| n.to_str()).unwrap_or("upload.bin").to_string();
     // UUID prefix prevents filename collision (B1 fix)
     let uid = Uuid::new_v4().to_string()[..8].to_string();
-    let path = format!("/tmp/vidpress_{}_{}", uid, name);
+    let path = format!("{INGEST_DIR}/{INGEST_PREFIX}{uid}_{name}");
     if let Err(e) = tokio::fs::write(&path, &req.body).await {
         return Response { status: 500, body: format!(r#"{{"error":"{e}"}}"#) , ..Default::default() };
     }
@@ -501,11 +569,17 @@ async fn upload(req: Request) -> Response {
         Ok(v) => v,
         Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into(), ..Default::default() },
     };
-    let path = match body["path"].as_str() {
+    let raw_path = match body["path"].as_str() {
         Some(p) => p.to_string(),
         None => return Response { status: 400, body: r#"{"error":"missing path"}"#.into(), ..Default::default() },
     };
+    let path = match validate_ingest_path(&raw_path) { Ok(p) => p, Err(r) => return r };
     let webhook_url = body["webhook_url"].as_str().map(String::from);
+    if let Some(ref wh) = webhook_url {
+        if let Err(e) = validate_outbound_url(wh).await {
+            return Response { status: 400, body: format!(r#"{{"error":"invalid webhook_url: {e}"}}"#), ..Default::default() };
+        }
+    }
     let preset = body["preset"].as_str().map(String::from);
     let output_format = body["output_format"].as_str().map(String::from);
 
@@ -637,6 +711,11 @@ async fn create_key(req: Request) -> Response {
         _ => "free",
     };
     let webhook_url = body["webhook_url"].as_str().map(String::from);
+    if let Some(ref wh) = webhook_url {
+        if let Err(e) = validate_outbound_url(wh).await {
+            return Response { status: 400, body: format!(r#"{{"error":"invalid webhook_url: {e}"}}"#), ..Default::default() };
+        }
+    }
     let wl_domain = body["white_label_domain"].as_str().map(String::from);
     let wl_brand = body["white_label_brand"].as_str().map(String::from);
 
@@ -676,8 +755,16 @@ async fn download_url(req: Request) -> Response {
         Some(u) => u.to_string(),
         None => return Response { status: 400, body: r#"{"error":"missing url"}"#.into(), ..Default::default() },
     };
+    if let Err(e) = validate_outbound_url(&url).await {
+        return Response { status: 400, body: format!(r#"{{"error":"invalid url: {e}"}}"#), ..Default::default() };
+    }
     let audio_only = body["audio_only"].as_bool().unwrap_or(false);
     let webhook_url = body["webhook_url"].as_str().map(String::from);
+    if let Some(ref wh) = webhook_url {
+        if let Err(e) = validate_outbound_url(wh).await {
+            return Response { status: 400, body: format!(r#"{{"error":"invalid webhook_url: {e}"}}"#), ..Default::default() };
+        }
+    }
 
     let id = Uuid::new_v4().to_string();
     let out_dir = storage_dir();
@@ -726,7 +813,7 @@ async fn transcribe(req: Request) -> Response {
             None => return Response { status: 404, body: r#"{"error":"job not found"}"#.into(), ..Default::default() },
         }
     } else if let Some(p) = body["path"].as_str() {
-        p.to_string()
+        match validate_ingest_path(p) { Ok(v) => v, Err(r) => return r }
     } else {
         return Response { status: 400, body: r#"{"error":"provide job_id or path"}"#.into(), ..Default::default() };
     };
@@ -836,7 +923,7 @@ async fn remux_to_mp4_if_needed(path: &str) -> String {
     if ext != "mov" && ext != "avi" && ext != "mkv" { return path.to_string(); }
     let out = format!("{}.mp4", &path[..path.len() - ext.len() - 1]);
     let result = Command::new("ffmpeg")
-        .args(["-y", "-i", path, "-c", "copy", "-movflags", "+faststart", &out])
+        .args(["-y", "-protocol_whitelist", "file", "-i", path, "-c", "copy", "-movflags", "+faststart", &out])
         .output().await;
     match result {
         Ok(o) if o.status.success() => { let _ = tokio::fs::remove_file(path).await; out }
@@ -874,7 +961,7 @@ async fn compress(
     // Preset overrides default ffmpeg args
     let ffmpeg_args = preset_ffmpeg_args(&preset).unwrap_or(profile.ffmpeg_args.clone());
 
-    let mut args: Vec<String> = vec!["-y".into(), "-i".into(), input.clone()];
+    let mut args: Vec<String> = vec!["-y".into(), "-protocol_whitelist".into(), "file".into(), "-i".into(), input.clone()];
     args.extend(ffmpeg_args);
     if duration > 0.1 {
         args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
@@ -998,13 +1085,64 @@ fn parse_us(content: &str) -> Option<u64> {
 fn extract_path(req: &Request) -> Result<String, Response> {
     let body: serde_json::Value = serde_json::from_slice(&req.body)
         .map_err(|_| Response { status: 400, body: r#"{"error":"expected JSON with 'path' field"}"#.into(), ..Default::default() })?;
-    body["path"].as_str().map(String::from)
-        .ok_or_else(|| Response { status: 400, body: r#"{"error":"missing 'path' field"}"#.into(), ..Default::default() })
+    let raw = body["path"].as_str()
+        .ok_or_else(|| Response { status: 400, body: r#"{"error":"missing 'path' field"}"#.into(), ..Default::default() })?;
+    validate_ingest_path(raw)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::content_type_for;
+    use super::{content_type_for, is_disallowed_ip, validate_ingest_path, validate_outbound_url, INGEST_DIR, INGEST_PREFIX};
+
+    #[test]
+    fn validate_ingest_path_accepts_real_ingest_file() {
+        let path = format!("{INGEST_DIR}/{INGEST_PREFIX}test_accept.bin");
+        std::fs::write(&path, b"hi").unwrap();
+        let result = validate_ingest_path(&path);
+        std::fs::remove_file(&path).ok();
+        assert!(result.is_ok(), "expected a real ingest-prefixed file under INGEST_DIR to be accepted");
+    }
+
+    #[test]
+    fn validate_ingest_path_rejects_files_outside_ingest_dir() {
+        // A real file that exists, but not under INGEST_DIR/with the ingest prefix.
+        assert!(validate_ingest_path("/etc/hostname").is_err());
+    }
+
+    #[test]
+    fn validate_ingest_path_rejects_wrong_filename_prefix_even_inside_ingest_dir() {
+        let path = format!("{INGEST_DIR}/not_our_prefix_test.bin");
+        std::fs::write(&path, b"hi").unwrap();
+        let result = validate_ingest_path(&path);
+        std::fs::remove_file(&path).ok();
+        assert!(result.is_err(), "a file under INGEST_DIR without our prefix must not be treated as ours");
+    }
+
+    #[test]
+    fn validate_ingest_path_rejects_nonexistent_or_protocol_strings() {
+        assert!(validate_ingest_path("http://169.254.169.254/latest/meta-data/").is_err());
+        assert!(validate_ingest_path("concat:/etc/passwd|/etc/shadow").is_err());
+        assert!(validate_ingest_path(&format!("{INGEST_DIR}/{INGEST_PREFIX}does_not_exist.bin")).is_err());
+    }
+
+    #[test]
+    fn is_disallowed_ip_blocks_loopback_private_and_link_local() {
+        assert!(is_disallowed_ip(&"127.0.0.1".parse().unwrap()));
+        assert!(is_disallowed_ip(&"169.254.169.254".parse().unwrap())); // cloud metadata
+        assert!(is_disallowed_ip(&"10.0.0.5".parse().unwrap()));
+        assert!(is_disallowed_ip(&"192.168.1.1".parse().unwrap()));
+        assert!(is_disallowed_ip(&"::1".parse().unwrap()));
+        assert!(!is_disallowed_ip(&"8.8.8.8".parse().unwrap()));
+    }
+
+    #[tokio::test]
+    async fn validate_outbound_url_rejects_non_http_schemes_and_loopback() {
+        assert!(validate_outbound_url("file:///etc/passwd").await.is_err());
+        assert!(validate_outbound_url("ftp://example.com/x").await.is_err());
+        assert!(validate_outbound_url("http://127.0.0.1/admin").await.is_err());
+        assert!(validate_outbound_url("http://169.254.169.254/latest/meta-data/").await.is_err());
+        assert!(validate_outbound_url("not a url at all").await.is_err());
+    }
 
     #[test]
     fn content_type_matches_extension() {
