@@ -702,14 +702,13 @@ async fn create_key(req: Request) -> Response {
         Ok(v) => v, Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into(), ..Default::default() },
     };
     let name = body["name"].as_str().unwrap_or("unnamed").to_string();
-    let plan = match body["plan"].as_str() {
-        Some("premium") => "premium",
-        Some("api_starter") => "api_starter",
-        Some("api_growth") => "api_growth",
-        Some("api_scale") => "api_scale",
-        Some("whitelabel") => "whitelabel",
-        _ => "free",
-    };
+    // Self-serve key creation only ever issues the free plan — there is no
+    // payment verification here, so trusting a client-supplied `plan` (as
+    // this used to do) let anyone mint a "premium"/"api_scale"/"whitelabel"
+    // key for free. Paid plans must be granted out of band (e.g. an admin
+    // action after a Stripe webhook confirms payment) by updating the row
+    // directly, not through this endpoint.
+    let plan = "free";
     let webhook_url = body["webhook_url"].as_str().map(String::from);
     if let Some(ref wh) = webhook_url {
         if let Err(e) = validate_outbound_url(wh).await {
