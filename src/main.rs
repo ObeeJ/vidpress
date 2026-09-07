@@ -483,6 +483,8 @@ async fn ingest(req: Request) -> Response {
 /// POST /analyze — { path } → MediaProfile
 #[post("/analyze")]
 async fn analyze(req: Request) -> Response {
+    let State(state) = State::<AppState>::from_request(&req).unwrap();
+    if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
     let path = match extract_path(&req) { Ok(p) => p, Err(r) => return r };
     match detect(&path).await {
         Ok(profile) => Response { status: 200, body: serde_json::to_string(&profile).unwrap(), ..Default::default() },
@@ -494,6 +496,7 @@ async fn analyze(req: Request) -> Response {
 #[post("/upload")]
 async fn upload(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
+    if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
     let body: serde_json::Value = match serde_json::from_slice(&req.body) {
         Ok(v) => v,
         Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into(), ..Default::default() },
@@ -554,6 +557,7 @@ async fn upload(req: Request) -> Response {
 #[get("/jobs/:id")]
 async fn get_job(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
+    if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
     let id = req.params.get("id").cloned().unwrap_or_default();
     // Check in-memory first, fall back to DB (survives restart)
     let job = state.jobs.lock().unwrap().get(&id).cloned()
@@ -589,6 +593,7 @@ fn content_type_for(output_path: &str) -> &'static str {
 #[get("/download/:id")]
 async fn download(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
+    if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
     let id = req.params.get("id").cloned().unwrap_or_default();
     let job = state.jobs.lock().unwrap().get(&id).cloned()
         .or_else(|| db_get_job(&state.db, &id));
@@ -616,6 +621,9 @@ async fn health(_req: Request) -> Response {
 #[post("/keys")]
 async fn create_key(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
+    // Anonymous by definition (a key doesn't exist yet) — still rate-limited
+    // per IP so this can't be used to flood api_keys.
+    if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
     let body: serde_json::Value = match serde_json::from_slice(&req.body) {
         Ok(v) => v, Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into(), ..Default::default() },
     };
@@ -757,6 +765,7 @@ async fn transcribe(req: Request) -> Response {
 #[get("/transcriptions/:id")]
 async fn get_transcription(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
+    if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
     let id = req.params.get("id").cloned().unwrap_or_default();
     let conn = state.db.lock().unwrap();
     let result = conn.query_row(
