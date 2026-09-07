@@ -21,6 +21,17 @@ fn db_path() -> String {
     std::env::var("VIDPRESS_DB").unwrap_or_else(|_| "/tmp/vidpress.db".into())
 }
 
+/// CORS origin for browser-based third-party API consumers, e.g.
+/// "https://your-integration.example.com" (or "*" to allow any origin —
+/// only appropriate if every endpoint stays behind its own auth, since a
+/// wildcard origin lets any website's JS read authenticated responses).
+/// Unset by default: the shipped UI talks to this API same-origin through
+/// nginx and never needs CORS; this only matters for someone calling the
+/// API directly from browser JS on a different origin.
+fn cors_origin() -> Option<String> {
+    std::env::var("VIDPRESS_CORS_ORIGIN").ok().filter(|s| !s.is_empty())
+}
+
 /// Directory raw uploads land in via /ingest — deliberately not configurable
 /// (see ingest()), so path validation below can pin against it exactly.
 const INGEST_DIR: &str = "/tmp";
@@ -1214,7 +1225,7 @@ async fn main() {
         .config(Config {
             body_limit: 2 * 1024 * 1024 * 1024,
             request_timeout: Duration::from_secs(600),
-            cors_origin: Some("*".into()),
+            cors_origin: cors_origin(),
         })
         .state(state)
         .mount_routes()
