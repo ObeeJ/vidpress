@@ -145,7 +145,7 @@ export default function FileCard({ item }: { item: FileItem }) {
         selectedPreset === "original" ? targetMb : undefined,
       );
       setJobId(item.localUrl, job_id);
-      toast("Theflating...", "info");
+      toast("Theflating your file...", "info");
     } catch (e) {
       setError(item.localUrl, String(e));
       toast(String(e), "error");
@@ -158,7 +158,7 @@ export default function FileCard({ item }: { item: FileItem }) {
     try {
       const res = await transcribeFile(job.id);
       setTranscription(res.text);
-      toast("Whisper AI transcription complete", "success");
+      toast("Transcription ready", "success");
     } catch (e) {
       toast(`Transcription failed: ${e}`, "error");
     } finally {
@@ -362,9 +362,9 @@ export default function FileCard({ item }: { item: FileItem }) {
         {job?.status === "done" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "12px 14px" }}>
-              {stat("Original Size", fmt(job.original_bytes))}
-              {stat("Compressed Size", fmt(job.compressed_bytes), "#10b981")}
-              {stat("Storage Reduction", `${(((job.original_bytes - job.compressed_bytes) / job.original_bytes) * 100).toFixed(1)}%`, "#10b981")}
+              {stat("Original", fmt(job.original_bytes))}
+              {stat("Theflated", fmt(job.compressed_bytes), "#10b981")}
+              {stat("Deflation", `${(((job.original_bytes - job.compressed_bytes) / job.original_bytes) * 100).toFixed(1)}%`, "#10b981")}
             </div>
 
             {/* Media Preview */}
@@ -384,9 +384,9 @@ export default function FileCard({ item }: { item: FileItem }) {
             {(profile?.kind === "video" || profile?.kind?.includes("audio")) && (
               <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>OpenAI Whisper Transcription</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>Transcribe</div>
                   <button onClick={runTranscription} disabled={transcribing} className="vpx-button-secondary" style={{ fontSize: 11, padding: "4px 12px" }}>
-                    {transcribing ? "Transcribing..." : transcription ? "Re-transcribe" : "Generate Text"}
+                    {transcribing ? "Transcribing..." : transcription ? "Redo" : "Generate"}
                   </button>
                 </div>
                 {transcription && (
