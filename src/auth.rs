@@ -67,6 +67,9 @@ pub fn now_secs() -> i64 {
 }
 
 pub fn auth_and_rate(req: &Request, db: &Db) -> Result<Option<ApiKey>, Response> {
+    if std::env::var("THEFLATE_DEV_MODE").as_deref() == Ok("1") {
+        return Ok(None);
+    }
     if let Some(key) = req.headers.get("x-api-key") {
         match lookup_api_key(db, key.trim()) {
             Some(ak) => {

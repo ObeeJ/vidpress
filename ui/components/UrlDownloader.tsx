@@ -26,7 +26,7 @@ export default function UrlDownloader() {
       if (!r.ok) throw new Error(data.error);
       setJobId(data.job_id);
       setStatus("queued");
-      toast("Download pipeline triggered", "info");
+      toast("Download started", "info");
 
       const poll = setInterval(async () => {
         const jr = await fetch(`${API}/jobs/${data.job_id}`);
@@ -52,11 +52,8 @@ export default function UrlDownloader() {
     <div style={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 12, padding: "20px", display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#ffffff" }}>URL Extraction Engine</h3>
-          <p style={{ fontSize: 12, color: "#a1a1aa" }}>Paste link from YouTube, Instagram, TikTok, X (Twitter), or Facebook</p>
-        </div>
-        <div style={{ fontSize: 10, fontWeight: 700, padding: "3px 8px", borderRadius: 4, background: "#18181b", border: "1px solid #27272a", color: "#a1a1aa" }}>
-          yt-dlp core
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: "#ffffff" }}>Download from URL</h3>
+          <p style={{ fontSize: 12, color: "#a1a1aa" }}>Paste a link from YouTube, Instagram, TikTok, X (Twitter), or Facebook</p>
         </div>
       </div>
 
@@ -95,16 +92,14 @@ export default function UrlDownloader() {
             onChange={(e) => setAudioOnly(e.target.checked)}
             style={{ accentColor: "#ffffff", width: 15, height: 15, borderRadius: 4 }}
           />
-          Audio extraction mode (Convert directly to MP3)
-        </label>
-        <span style={{ fontSize: 11, color: "#71717a" }}>Sub-second worker queue</span>
+        <span style={{ fontSize: 11, color: "#71717a" }}>Audio only (MP3)</span>
       </div>
 
       {/* Progress state */}
       {status && status !== "done" && status !== "failed" && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, background: "#121215", border: "1px solid #27272a", fontSize: 13, color: "#f4f4f5" }}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981", animation: "vpx-pulse 1s infinite" }} />
-          <span>Status: <strong style={{ color: "#ffffff", textTransform: "capitalize" }}>{status}</strong> — Extracting stream...</span>
+          <span>Status: <strong style={{ color: "#ffffff", textTransform: "capitalize" }}>{status}</strong> — Downloading...</span>
         </div>
       )}
 

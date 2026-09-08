@@ -4,8 +4,8 @@ import PoemFaq from "@/components/PoemFaq";
 import Link from "next/link";
 
 export const metadata = {
-  title: "P.O.E.M & Vision — VPX Engine",
-  description: "Problem, Solution, Strategy — The foundational premise of VPX media engine.",
+  title: "P.O.E.M & Vision — theflate",
+  description: "Problem, Solution, Strategy — The foundational premise of theflate.",
 };
 
 export default function PoemPage() {
@@ -28,10 +28,10 @@ export default function PoemPage() {
           </p>
           <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
             <Link href="/" className="vpx-button-primary">
-              Test VPX Engine
+              Try theflate
             </Link>
-            <Link href="/pricing" className="vpx-button-secondary">
-              View API Tiers
+            <Link href="/docs" className="vpx-button-secondary">
+              View API Docs
             </Link>
           </div>
         </div>

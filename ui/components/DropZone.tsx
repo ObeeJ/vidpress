@@ -73,10 +73,10 @@ export default function DropZone() {
 
       <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 4 }}>
         <p style={{ fontWeight: 700, fontSize: 15, color: dragging ? "#ffffff" : "#f4f4f5" }}>
-          {dragging ? "Release file to ingest" : "Drop video, audio, or image files here"}
+          {dragging ? "Release to upload" : "Drop video, audio, or image files here"}
         </p>
         <p style={{ color: "#a1a1aa", fontSize: 13 }}>
-          {dragging ? "VPX instant Rust pipeline active" : "or click to browse local files"}
+          {dragging ? "Processing..." : "or click to browse local files"}
         </p>
       </div>
 

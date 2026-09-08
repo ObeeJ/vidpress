@@ -24,18 +24,55 @@ pub async fn download(req: Request) -> Response {
         .or_else(|| get_job(&state.db, &id));
     match job {
         Some(j) if matches!(j.status, JobStatus::Done) => {
-            match std::fs::read(&j.output_path) {
-                Ok(bytes) => {
-                    let mut res = Response::binary(200, bytes, content_type_for(&j.output_path));
-                    res.headers.push(("cache-control".into(), "public, max-age=86400, immutable".into()));
-                    res
-                }
-                Err(_) => Response { status: 404, body: r#"{"error":"output file missing"}"#.into(), ..Default::default() },
-            }
+            let meta = match std::fs::metadata(&j.output_path) {
+                Ok(m) => m,
+                Err(_) => return Response { status: 404, body: r#"{"error":"output file missing"}"#.into(), ..Default::default() },
+            };
+            let total = meta.len();
+            let ct = content_type_for(&j.output_path);
+
+            // Parse Range header
+            let range = req.headers.get("range").and_then(|v| {
+                let v = v.trim().strip_prefix("bytes=")?;
+                let mut parts = v.splitn(2, '-');
+                let start: u64 = parts.next()?.trim().parse().ok()?;
+                let end: u64 = parts.next().and_then(|e| e.trim().parse().ok()).unwrap_or(total - 1);
+                Some((start, end.min(total - 1)))
+            });
+
+            let (start, end, status) = match range {
+                Some((s, e)) => (s, e, 206u16),
+                None         => (0, total - 1, 200u16),
+            };
+
+            let len = end - start + 1;
+            let bytes = match read_range(&j.output_path, start, len) {
+                Ok(b) => b,
+                Err(_) => return Response { status: 500, body: r#"{"error":"read failed"}"#.into(), ..Default::default() },
+            };
+
+            let mut res = Response::binary(status, bytes, ct);
+            let filename = std::path::Path::new(&j.output_path).file_name().and_then(|n| n.to_str()).unwrap_or("output");
+            res.headers.push(("content-disposition".into(), format!("attachment; filename=\"{filename}\"")));
+            res.headers.push(("accept-ranges".into(), "bytes".into()));
+            res.headers.push(("content-length".into(), len.to_string()));
+            res.headers.push(("content-range".into(), format!("bytes {start}-{end}/{total}")));
+            res.headers.push(("cache-control".into(), "public, max-age=86400, immutable".into()));
+            res.headers.push(("cross-origin-resource-policy".into(), "cross-origin".into()));
+            res
         }
         Some(_) => Response { status: 409, body: r#"{"error":"job not done yet"}"#.into(), ..Default::default() },
         None    => Response { status: 404, body: r#"{"error":"job not found"}"#.into(), ..Default::default() },
     }
+}
+
+fn read_range(path: &str, offset: u64, len: u64) -> std::io::Result<Vec<u8>> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut f = std::fs::File::open(path)?;
+    f.seek(SeekFrom::Start(offset))?;
+    let mut buf = vec![0u8; len as usize];
+    f.read_exact(&mut buf)?;
+    Ok(buf)
 }
 
 #[get("/health")]

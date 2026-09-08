@@ -10,10 +10,10 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 
 const PRESETS = [
   { id: "original", label: "Original", desc: "Max quality ratio" },
-  { id: "web", label: "Web", desc: "Fast browser streaming" },
+  { id: "web", label: "Web", desc: "Optimised for browsers" },
   { id: "whatsapp", label: "WhatsApp", desc: "Under 16MB cap" },
   { id: "instagram_reel", label: "Instagram", desc: "9:16 Vertical" },
-  { id: "twitter", label: "Twitter/X", desc: "Optimized H.264" },
+  { id: "twitter", label: "Twitter/X", desc: "Optimised for X" },
 ];
 
 const DESTINATIONS = [
@@ -79,8 +79,6 @@ export default function FileCard({ item }: { item: FileItem }) {
   const [transcription, setTranscription] = useState<string | null>(null);
   const [transcribing, setTranscribing] = useState(false);
   const [showQrModal, setShowQrModal] = useState(false);
-  
-  // Destination Export state
   const [showExport, setShowExport] = useState(false);
   const [exportProvider, setExportProvider] = useState("s3");
   const [exportBucket, setExportBucket] = useState("");
@@ -88,7 +86,6 @@ export default function FileCard({ item }: { item: FileItem }) {
   const [exportedUrl, setExportedUrl] = useState<string | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Ingest & analyze on mount
   useEffect(() => {
@@ -105,23 +102,20 @@ export default function FileCard({ item }: { item: FileItem }) {
       });
   }, [item.file, item.localUrl, item.profile, item.error, item.serverPath, setUploadPct, setServerPath, setProfile, setError]);
 
-  // Poll job status + refresh preview URL while processing
+  // Poll job status
   useEffect(() => {
     if (!item.jobId || item.job?.status === "done" || item.job?.status === "failed") return;
-    // Set preview URL immediately so video/audio can start loading partial data
-    setPreviewUrl(`${API}/preview/${item.jobId}?t=${Date.now()}`);
     pollRef.current = setInterval(async () => {
-      const job = await getJob(item.jobId!);
-      setJob(item.localUrl, job);
-      // Refresh preview src to pick up more bytes
-      if (job.status === "processing") {
-        setPreviewUrl(`${API}/preview/${item.jobId}?t=${Date.now()}`);
-      }
-      if (job.status === "done" || job.status === "failed") {
-        if (pollRef.current) clearInterval(pollRef.current);
-        setPreviewUrl(null);
-        if (job.status === "done") toast(`${item.file.name} successfully compressed`, "success");
-        if (job.status === "failed") toast(`Compression failed for ${item.file.name}`, "error");
+      try {
+        const job = await getJob(item.jobId!);
+        setJob(item.localUrl, job);
+        if (job.status === "done" || job.status === "failed") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          if (job.status === "done") toast(`${item.file.name} successfully compressed`, "success");
+          if (job.status === "failed") toast(`Compression failed for ${item.file.name}`, "error");
+        }
+      } catch {
+        // transient error — keep polling
       }
     }, 800);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
@@ -176,7 +170,7 @@ export default function FileCard({ item }: { item: FileItem }) {
     setExporting(true);
     try {
       const res = await exportToDestination(job.id, exportProvider, {
-        bucket: exportBucket || "vpx-media-bucket",
+        bucket: exportBucket || "my-media-bucket",
         targetPath: `exports/${item.file.name}`,
       });
       setExportedUrl(res.remote_url);
@@ -225,7 +219,7 @@ export default function FileCard({ item }: { item: FileItem }) {
       </div>
 
       <div style={{ padding: "18px", display: "flex", flexDirection: "column", gap: 18 }}>
-        {/* Error Notification */}
+        {/* Error */}
         {item.error && (
           <div style={{ color: "#ef4444", fontSize: 12, background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.2)", padding: "10px 14px", borderRadius: 8 }}>
             {item.error}
@@ -236,7 +230,7 @@ export default function FileCard({ item }: { item: FileItem }) {
         {!profile && !item.error && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a1a1aa" }}>
-              <span>{item.serverPath ? "Analyzing media metrics..." : "Uploading stream to Rust worker..."}</span>
+              <span>{item.serverPath ? "Analyzing file..." : "Uploading..."}</span>
               {!item.serverPath && <span>{item.uploadPct ?? 0}%</span>}
             </div>
             <div style={{ height: 4, background: "#18181b", borderRadius: 99, overflow: "hidden" }}>
@@ -253,32 +247,27 @@ export default function FileCard({ item }: { item: FileItem }) {
           </div>
         )}
 
-        {/* Profile Statistics Grid */}
+        {/* Profile Stats */}
         {profile && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "12px 14px" }}>
-            {stat("Raw Size", fmt(profile.size_bytes))}
-            {stat("Codec", profile.codec_name)}
+            {stat("Size", fmt(profile.size_bytes))}
+            {stat("Format", profile.codec_name)}
             {profile.duration_secs > 0 ? stat("Duration", fmtTime(Math.round(profile.duration_secs))) : stat("Type", profile.kind)}
-            {profile.width ? stat("Dimensions", `${profile.width}×${profile.height}`) : stat("Output Ext", profile.output_ext.toUpperCase())}
+            {profile.width ? stat("Dimensions", `${profile.width}×${profile.height}`) : stat("Output", profile.output_ext.toUpperCase())}
           </div>
         )}
 
-        {/* Output Format Picker */}
+        {/* Format Picker */}
         {profile && !job && profile.available_formats?.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ fontSize: 12, color: "#a1a1aa", fontWeight: 500 }}>Target Output Format</span>
+            <span style={{ fontSize: 12, color: "#a1a1aa", fontWeight: 500 }}>Output Format</span>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {profile.available_formats.map((fmtExt) => (
                 <button
                   key={fmtExt}
                   onClick={() => setOutputFormat(item.localUrl, fmtExt)}
                   style={{
-                    padding: "4px 12px",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    fontSize: 11,
-                    fontWeight: 700,
-                    textTransform: "uppercase",
+                    padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700, textTransform: "uppercase",
                     border: `1px solid ${selectedFormat === fmtExt ? "#ffffff" : "#27272a"}`,
                     background: selectedFormat === fmtExt ? "#18181b" : "#09090b",
                     color: selectedFormat === fmtExt ? "#ffffff" : "#71717a",
@@ -294,22 +283,17 @@ export default function FileCard({ item }: { item: FileItem }) {
         {/* Preset Selector */}
         {profile && !job && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ fontSize: 12, color: "#a1a1aa", fontWeight: 500 }}>Encoding Profile Preset</span>
+            <span style={{ fontSize: 12, color: "#a1a1aa", fontWeight: 500 }}>Quality Preset</span>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {PRESETS.map((p) => (
                 <button
                   key={p.id}
                   onClick={() => setPreset(item.localUrl, p.id)}
                   style={{
-                    padding: "6px 12px",
-                    borderRadius: 6,
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontWeight: 600,
+                    padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, textAlign: "left",
                     border: `1px solid ${selectedPreset === p.id ? "#ffffff" : "#27272a"}`,
                     background: selectedPreset === p.id ? "#18181b" : "#09090b",
                     color: selectedPreset === p.id ? "#ffffff" : "#71717a",
-                    textAlign: "left",
                   }}
                 >
                   <div>{p.label}</div>
@@ -324,7 +308,7 @@ export default function FileCard({ item }: { item: FileItem }) {
         {profile && !job && selectedPreset === "original" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "#a1a1aa", fontSize: 12 }}>Custom Target Compression Threshold</span>
+              <span style={{ color: "#a1a1aa", fontSize: 12 }}>Target file size</span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontWeight: 700, fontSize: 14, color: "#ffffff" }}>{targetMb.toFixed(1)} MB</span>
                 <span style={{ fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "#10b98122", color: "#10b981", border: "1px solid #10b98144" }}>
@@ -333,60 +317,43 @@ export default function FileCard({ item }: { item: FileItem }) {
               </div>
             </div>
             <input
-              type="range"
-              min={minMb}
-              max={originalMb}
-              step={0.1}
-              value={targetMb}
+              type="range" min={minMb} max={originalMb} step={0.1} value={targetMb}
               onChange={(e) => setTargetMb(item.localUrl, Number(e.target.value))}
               style={{ width: "100%", accentColor: "#ffffff", cursor: "pointer" }}
             />
           </div>
         )}
 
-        {/* Estimates Bar */}
+        {/* Estimates */}
         {profile && !job && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "10px 14px" }}>
-            {stat("Estimated Egress Cost", costEstimate, "#10b981")}
+            {stat("Est. Cost", costEstimate, "#10b981")}
             {stat("Compress Time", fmtTime(profile.estimated_time_secs))}
             {stat("Download Time", fmtTime(downloadTimeSecs))}
           </div>
         )}
 
-        {/* Compress Action */}
+        {/* Compress Button */}
         {profile && !job && (
           <button onClick={compress} className="vpx-button-primary" style={{ width: "100%", padding: "10px" }}>
-            Trigger Compression Pipeline →
+            Compress →
           </button>
         )}
 
-        {/* Compression Active Status + Live Preview */}
+        {/* Processing State */}
         {job && job.status !== "done" && job.status !== "failed" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a1a1aa" }}>
-              <span>Rust Worker executing FFmpeg stream...</span>
+              <span>Compressing...</span>
               <span>{job.progress}% · ETA {fmtTime(job.eta_secs)}</span>
             </div>
             <div style={{ height: 6, background: "#18181b", borderRadius: 99, overflow: "hidden" }}>
               <div style={{ height: "100%", width: `${job.progress}%`, background: "#ffffff", borderRadius: 99, transition: "width 0.4s ease" }} />
             </div>
-            {/* Live preview — shows partial output as ffmpeg writes it */}
-            {previewUrl && profile && job.progress > 5 && (
-              <div style={{ borderRadius: 8, overflow: "hidden", background: "#000", border: "1px solid #27272a" }}>
-                {profile.kind === "video" || profile.kind === "image_animated" ? (
-                  <video key={previewUrl} src={previewUrl} autoPlay muted playsInline controls style={{ width: "100%", maxHeight: 240, display: "block" }} />
-                ) : profile.kind?.includes("audio") ? (
-                  <audio key={previewUrl} src={previewUrl} controls style={{ width: "100%", padding: 12 }} />
-                ) : (
-                  <img key={previewUrl} src={previewUrl} alt="preview" style={{ width: "100%", maxHeight: 240, objectFit: "contain", display: "block" }} />
-                )}
-                <div style={{ padding: "6px 10px", fontSize: 10, color: "#52525b" }}>Live preview — encoding in progress</div>
-              </div>
-            )}
           </div>
         )}
 
-        {/* Job Done State */}
+        {/* Done State */}
         {job?.status === "done" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "12px 14px" }}>
@@ -395,30 +362,25 @@ export default function FileCard({ item }: { item: FileItem }) {
               {stat("Storage Reduction", `${(((job.original_bytes - job.compressed_bytes) / job.original_bytes) * 100).toFixed(1)}%`, "#10b981")}
             </div>
 
-            {/* Media Output Preview */}
+            {/* Media Preview */}
             {outputUrl && profile && (
               <div style={{ borderRadius: 8, overflow: "hidden", background: "#000000", border: "1px solid #27272a" }}>
                 {profile.kind === "video" || profile.kind === "image_animated" ? (
-                  <video src={outputUrl} controls style={{ width: "100%", maxHeight: 280, display: "block" }} />
+                  <video src={outputUrl} controls crossOrigin="anonymous" style={{ width: "100%", maxHeight: 280, display: "block" }} />
                 ) : profile.kind?.includes("audio") ? (
-                  <audio src={outputUrl} controls style={{ width: "100%", padding: 12 }} />
+                  <audio src={outputUrl} controls crossOrigin="anonymous" style={{ width: "100%", padding: 12 }} />
                 ) : (
                   <img src={outputUrl} alt="preview" style={{ width: "100%", maxHeight: 280, objectFit: "contain", display: "block" }} />
                 )}
               </div>
             )}
 
-            {/* Whisper Transcription Trigger */}
+            {/* Transcription */}
             {(profile?.kind === "video" || profile?.kind?.includes("audio")) && (
               <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>OpenAI Whisper Transcription</div>
-                  <button
-                    onClick={runTranscription}
-                    disabled={transcribing}
-                    className="vpx-button-secondary"
-                    style={{ fontSize: 11, padding: "4px 12px" }}
-                  >
+                  <button onClick={runTranscription} disabled={transcribing} className="vpx-button-secondary" style={{ fontSize: 11, padding: "4px 12px" }}>
                     {transcribing ? "Transcribing..." : transcription ? "Re-transcribe" : "Generate Text"}
                   </button>
                 </div>
@@ -430,22 +392,17 @@ export default function FileCard({ item }: { item: FileItem }) {
               </div>
             )}
 
-            {/* Cloud Storage Destination Export Box */}
+            {/* Cloud Export */}
             <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>Cloud Storage Export Destination</div>
-                  <div style={{ fontSize: 11, color: "#71717a" }}>Stream output to AWS S3, Cloudflare R2, Supabase, Google Drive, or Dropbox</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>Export to Cloud Storage</div>
+                  <div style={{ fontSize: 11, color: "#71717a" }}>Send your file to AWS S3, Cloudflare R2, Supabase, Google Drive, or Dropbox</div>
                 </div>
-                <button
-                  onClick={() => setShowExport(!showExport)}
-                  className="vpx-button-secondary"
-                  style={{ fontSize: 11, padding: "4px 12px" }}
-                >
+                <button onClick={() => setShowExport(!showExport)} className="vpx-button-secondary" style={{ fontSize: 11, padding: "4px 12px" }}>
                   {showExport ? "Hide Target" : "Configure Destination"}
                 </button>
               </div>
-
               {showExport && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 4 }}>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -454,11 +411,7 @@ export default function FileCard({ item }: { item: FileItem }) {
                         key={dest.id}
                         onClick={() => setExportProvider(dest.id)}
                         style={{
-                          padding: "4px 10px",
-                          borderRadius: 6,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: "pointer",
+                          padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer",
                           border: `1px solid ${exportProvider === dest.id ? "#ffffff" : "#27272a"}`,
                           background: exportProvider === dest.id ? "#18181b" : "#000000",
                           color: exportProvider === dest.id ? "#ffffff" : "#71717a",
@@ -468,33 +421,17 @@ export default function FileCard({ item }: { item: FileItem }) {
                       </button>
                     ))}
                   </div>
-
                   <div style={{ display: "flex", gap: 8 }}>
                     <input
                       value={exportBucket}
                       onChange={(e) => setExportBucket(e.target.value)}
                       placeholder={DESTINATIONS.find((d) => d.id === exportProvider)?.placeholder ?? "target-name"}
-                      style={{
-                        flex: 1,
-                        padding: "8px 12px",
-                        borderRadius: 6,
-                        background: "#000000",
-                        border: "1px solid #27272a",
-                        color: "#ffffff",
-                        fontSize: 12,
-                        outline: "none",
-                      }}
+                      style={{ flex: 1, padding: "8px 12px", borderRadius: 6, background: "#000000", border: "1px solid #27272a", color: "#ffffff", fontSize: 12, outline: "none" }}
                     />
-                    <button
-                      onClick={handleDestinationExport}
-                      disabled={exporting}
-                      className="vpx-button-primary"
-                      style={{ fontSize: 12, padding: "6px 14px", whiteSpace: "nowrap" }}
-                    >
+                    <button onClick={handleDestinationExport} disabled={exporting} className="vpx-button-primary" style={{ fontSize: 12, padding: "6px 14px", whiteSpace: "nowrap" }}>
                       {exporting ? "Exporting..." : "Send File"}
                     </button>
                   </div>
-
                   {exportedUrl && (
                     <div style={{ fontSize: 11, color: "#10b981", background: "#10b98111", border: "1px solid #10b98133", padding: "8px 12px", borderRadius: 6, wordBreak: "break-all" }}>
                       Successfully exported: <a href={exportedUrl} target="_blank" rel="noreferrer" style={{ color: "#10b981", fontWeight: 700 }}>{exportedUrl}</a>
@@ -504,20 +441,14 @@ export default function FileCard({ item }: { item: FileItem }) {
               )}
             </div>
 
-            {/* Actions Bar */}
+            {/* Actions */}
             <div style={{ display: "flex", gap: 10 }}>
-              <button
-                onClick={() => setShowQrModal(!showQrModal)}
-                className="vpx-button-secondary"
-                style={{ flex: 1 }}
-              >
+              <button onClick={() => setShowQrModal(!showQrModal)} className="vpx-button-secondary" style={{ flex: 1 }}>
                 {showQrModal ? "Hide QR Code" : "QR Share"}
               </button>
               {outputUrl && (
                 <a href={outputUrl} download style={{ flex: 1, textDecoration: "none" }}>
-                  <button className="vpx-button-primary" style={{ width: "100%" }}>
-                    Download Compressed File
-                  </button>
+                  <button className="vpx-button-primary" style={{ width: "100%" }}>Download Compressed File</button>
                 </a>
               )}
             </div>

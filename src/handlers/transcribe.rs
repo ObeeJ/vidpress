@@ -34,26 +34,40 @@ pub async fn transcribe(req: Request) -> Response {
     let out_dir = storage_dir();
     let out_file = format!("{}/{}_transcript.json", out_dir, tid);
 
-    match Command::new("whisper")
-        .args([&path, "--model", model, "--output_format", "json", "--output_dir", &out_dir, "--language", "auto"])
-        .output().await
-    {
+    let whisper_result = Command::new("whisper")
+        .args([&path, "--model", model, "--output_format", "json", "--output_dir", &out_dir])
+        .output().await;
+
+    match whisper_result {
         Ok(o) if o.status.success() => {
             let stem = std::path::Path::new(&path).file_stem().and_then(|s| s.to_str()).unwrap_or("output");
             let whisper_out = format!("{}/{}.json", out_dir, stem);
-            let text = tokio::fs::read_to_string(&whisper_out).await
+            let raw = tokio::fs::read_to_string(&whisper_out).await
                 .unwrap_or_else(|_| String::from_utf8_lossy(&o.stdout).into_owned());
+            // whisper json has a "text" field; fall back to raw if not
+            let text = serde_json::from_str::<serde_json::Value>(&raw)
+                .ok()
+                .and_then(|v| v["text"].as_str().map(|s| s.to_string()))
+                .unwrap_or(raw);
             {
                 let conn = state.db.lock().unwrap();
                 conn.execute(
                     "INSERT INTO transcriptions(id,job_id,text) VALUES(?1,?2,?3)",
-                    params![tid, body["job_id"].as_str().unwrap_or(""), text],
+                    params![tid, body["job_id"].as_str().unwrap_or(""), &text],
                 ).ok();
             }
             let _ = tokio::fs::rename(&whisper_out, &out_file).await;
             Response { status: 200, body: serde_json::json!({ "id": tid, "text": text, "model": model }).to_string().into(), ..Default::default() }
         }
-        _ => Response { status: 500, body: r#"{"error":"transcription failed"}"#.into(), ..Default::default() },
+        Ok(o) => {
+            let stderr = String::from_utf8_lossy(&o.stderr);
+            tracing::error!("whisper failed (exit {:?}):\n{}", o.status.code(), stderr);
+            Response { status: 500, body: serde_json::json!({ "error": "transcription failed", "detail": stderr.trim() }).to_string().into(), ..Default::default() }
+        }
+        Err(e) => {
+            tracing::error!("whisper spawn error: {e}");
+            Response { status: 500, body: serde_json::json!({ "error": "whisper not found", "detail": e.to_string() }).to_string().into(), ..Default::default() }
+        }
     }
 }
 

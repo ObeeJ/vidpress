@@ -95,7 +95,7 @@ export default function LiveStream() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: "#ffffff" }}>Live Stream</span>
-          <span style={{ fontSize: 12, color: "#71717a" }}>Stream screen to server in real-time via WebSocket</span>
+          <span style={{ fontSize: 12, color: "#71717a" }}>Record your screen and compress in real-time</span>
         </div>
         {streamState === "live" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -121,7 +121,7 @@ export default function LiveStream() {
         )}
         {streamState === "done" && jobId && (
           <div style={{ flex: 1, fontSize: 12, color: "#10b981" }}>
-            Stream saved — job <code style={{ color: "#ffffff" }}>{jobId.slice(0, 8)}…</code>
+            Recording saved — ready to download
           </div>
         )}
       </div>
@@ -141,8 +141,7 @@ export default function LiveStream() {
       )}
 
       <div style={{ fontSize: 11, color: "#52525b" }}>
-        Stream is encoded server-side and available for download when you end the session.
-        For OBS: point RTMP output to <code style={{ color: "#71717a" }}>rtmp://your-server/live</code> (coming soon).
+        Your recording will be available to download when you end the session.
       </div>
     </div>
   );

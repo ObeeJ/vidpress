@@ -2,8 +2,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 export const metadata = {
-  title: "Terms of Service — VPX Engine",
-  description: "Terms of service, API usage policies, and billing terms for VPX.",
+  title: "Terms of Service — theflate",
+  description: "Terms of service, API usage policies, and billing terms for theflate.",
 };
 
 export default function TermsPage() {
@@ -23,7 +23,7 @@ export default function TermsPage() {
           <section>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", marginBottom: 12 }}>1. Acceptable Use</h2>
             <p>
-              By accessing VPX or using the VPX API, you agree not to submit media files that contain illegal content, malware, or material that infringes upon third-party intellectual property rights. You are solely responsible for all content uploaded under your session or API key.
+              By accessing theflate or using the theflate API, you agree not to submit media files that contain illegal content, malware, or material that infringes upon third-party intellectual property rights. You are solely responsible for all content uploaded under your session or API key.
             </p>
           </section>
 
@@ -51,7 +51,7 @@ export default function TermsPage() {
           <section>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", marginBottom: 12 }}>5. Limitation of Liability</h2>
             <p>
-              In no event shall VPX Engine or its operators be liable for indirect, incidental, or consequential damages resulting from lost files, encoding delays, or service interruptions beyond the amount paid by you in the preceding billing period.
+              In no event shall theflate or its operators be liable for indirect, incidental, or consequential damages resulting from lost files, encoding delays, or service interruptions beyond the amount paid by you in the preceding billing period.
             </p>
           </section>
         </div>

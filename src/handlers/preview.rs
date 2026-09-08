@@ -28,6 +28,7 @@ pub async fn preview(req: Request) -> Response {
     let ct = content_type_for(&job.output_path);
     Response::binary(200, bytes, ct)
         .with_header("cache-control", "no-store")
+        .with_header("cross-origin-resource-policy", "cross-origin")
         .with_header("x-job-status", &format!("{:?}", job.status).to_lowercase())
         .with_header("x-job-progress", &job.progress.to_string())
 }

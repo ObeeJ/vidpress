@@ -15,6 +15,7 @@ use state::{AppState, cors_origin, db_path, detect_hw};
 
 #[tokio::main]
 async fn main() {
+    dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
     let conn = Connection::open(db_path()).expect("cannot open db");

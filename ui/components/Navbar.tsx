@@ -21,7 +21,6 @@ export default function Navbar() {
 
   const links = [
     { href: "/", label: "Engine" },
-    { href: "/pricing", label: "Pricing" },
     { href: "/docs", label: "API Docs" },
   ];
 
@@ -57,9 +56,7 @@ export default function Navbar() {
           })}
         </nav>
 
-        <Link href="/pricing" className="vpx-button-primary" style={{ fontSize: 13, padding: "7px 18px" }}>
-          Get API Key
-        </Link>
+
       </div>
     </header>
   );

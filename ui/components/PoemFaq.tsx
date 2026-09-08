@@ -40,7 +40,7 @@ export default function PoemFaq({ showTitle = true }: PoemFaqProps) {
             <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 12 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff", marginBottom: 4 }}>Developers & Engineering Teams</div>
               <div style={{ fontSize: 12, color: "#a1a1aa" }}>
-                Faced with skyrocketing S3 storage costs, massive Cloudflare egress fees, and the engineering overhead of setting up and scaling custom FFmpeg worker nodes.
+                Faced with skyrocketing S3 storage costs, massive Cloudflare egress fees, and the engineering overhead of setting up and scaling custom media processing pipelines.
               </div>
             </div>
             <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 12 }}>
@@ -64,7 +64,7 @@ export default function PoemFaq({ showTitle = true }: PoemFaqProps) {
       content: (
         <div style={{ display: "flex", flexDirection: "column", gap: 12, lineHeight: 1.6 }}>
           <p>
-            theflate is a unified, high-performance media engine written in Rust and powered by FFmpeg + Whisper AI.
+            theflate is a unified, high-performance media engine with built-in compression, conversion, and Whisper AI transcription.
           </p>
           <div style={{ border: "1px solid #27272a", borderRadius: 8, overflow: "hidden", marginTop: 4 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, textAlign: "left" }}>
@@ -87,7 +87,7 @@ export default function PoemFaq({ showTitle = true }: PoemFaqProps) {
                   <td style={{ padding: "8px 12px", color: "#10b981", fontWeight: 500 }}>Zero ads, 2GB limits, full programmatic REST API</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: "8px 12px", fontWeight: 600, color: "#f4f4f5" }}>DIY FFmpeg Scripts</td>
+                  <td style={{ padding: "8px 12px", fontWeight: 600, color: "#f4f4f5" }}>DIY Encoding Scripts</td>
                   <td style={{ padding: "8px 12px", color: "#a1a1aa" }}>High server setup, broken queues, worker scaling deadlocks</td>
                   <td style={{ padding: "8px 12px", color: "#10b981", fontWeight: 500 }}>Pre-packaged Rust queue, automated thread scaling</td>
                 </tr>

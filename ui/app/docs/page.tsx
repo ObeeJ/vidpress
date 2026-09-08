@@ -122,7 +122,7 @@ export default function DocsPage() {
             Developer Documentation
           </div>
           <h1 style={{ fontSize: 36, fontWeight: 900, letterSpacing: "-1px", color: "#ffffff", marginBottom: 8 }}>
-            VPX API Reference
+            theflate API Reference
           </h1>
           <p style={{ fontSize: 14, color: "#a1a1aa", maxWidth: 640 }}>
             Programmatic media compression, format conversion, link extraction, and OpenAI Whisper transcription endpoints.

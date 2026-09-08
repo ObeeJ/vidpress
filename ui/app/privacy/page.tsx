@@ -2,8 +2,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 export const metadata = {
-  title: "Privacy Policy — VPX Engine",
-  description: "Privacy policy, data retention, and automated file cleanup policy for VPX.",
+  title: "Privacy Policy — theflate",
+  description: "Privacy policy, data retention, and automated file cleanup policy for theflate.",
 };
 
 export default function PrivacyPage() {
@@ -23,7 +23,7 @@ export default function PrivacyPage() {
           <section>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", marginBottom: 12 }}>1. Automated Media Retention & Disposal</h2>
             <p>
-              VPX processes digital media (video, audio, images) exclusively to perform user-requested compression, format conversion, link extraction, or transcription. We do not inspect, retain, sell, or index your raw or processed media assets.
+              theflate processes digital media (video, audio, images) exclusively to perform user-requested compression, format conversion, link extraction, or transcription. We do not inspect, retain, sell, or index your raw or processed media assets.
             </p>
             <ul style={{ paddingLeft: 20, marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
               <li><strong style={{ color: "#ffffff" }}>Anonymous Jobs:</strong> Input and output files are automatically permanently deleted from volatile server storage after 24 hours.</li>
@@ -53,14 +53,14 @@ export default function PrivacyPage() {
           <section>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", marginBottom: 12 }}>4. Security & Encryption</h2>
             <p>
-              All traffic to VPX is encrypted in transit using standard TLS 1.3 encryption. Internal server storage uses isolated worker directories with restricted process permissions.
+              All traffic to theflate is encrypted in transit using standard TLS 1.3 encryption. Files are stored in isolated temporary directories with restricted process permissions.
             </p>
           </section>
 
           <section>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: "#ffffff", marginBottom: 12 }}>5. Contact</h2>
             <p>
-              For privacy inquiries or custom enterprise data retention agreements, contact privacy@vpxengine.com.
+              For privacy inquiries or custom enterprise data retention agreements, contact privacy@theflate.com.
             </p>
           </section>
         </div>

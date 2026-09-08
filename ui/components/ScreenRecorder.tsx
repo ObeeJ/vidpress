@@ -100,7 +100,7 @@ export default function ScreenRecorder() {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <span style={{ fontSize: 14, fontWeight: 700, color: "#ffffff" }}>Screen Recorder</span>
-          <span style={{ fontSize: 12, color: "#71717a" }}>Capture screen + mic → compress pipeline</span>
+          <span style={{ fontSize: 12, color: "#71717a" }}>Capture your screen and compress it</span>
         </div>
         {state === "recording" && (
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -123,13 +123,13 @@ export default function ScreenRecorder() {
         )}
         {state === "processing" && (
           <div style={{ flex: 1, padding: "10px", textAlign: "center", fontSize: 13, color: "#a1a1aa" }}>
-            Ingesting recording...
+            Processing...
           </div>
         )}
       </div>
 
       <div style={{ fontSize: 11, color: "#52525b" }}>
-        Browser will prompt to choose a screen, window, or tab. Audio is captured if permitted.
+        Browser will prompt you to choose a screen, window, or tab. Microphone audio is included if permitted.
       </div>
     </div>
   );
