@@ -28,7 +28,8 @@ async fn main() {
 
     let hw      = detect_hw().await;
     let max_jobs = std::env::var("THEFLATE_MAX_JOBS")
-        .ok().and_then(|v| v.parse().ok()).unwrap_or(4usize);
+        .ok().and_then(|v| v.parse().ok())
+        .unwrap_or_else(|| std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4));
 
     let state = AppState {
         jobs:     Arc::new(Mutex::new(jobs_map)),

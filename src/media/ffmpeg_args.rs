@@ -15,7 +15,7 @@ fn vaapi_video(crf_equiv: &str) -> Vec<String> {
 }
 
 fn sw_video(crf: &str) -> Vec<String> {
-    s(&["-c:v","libx264","-preset","fast","-crf",crf,"-c:a","aac","-b:a","128k","-movflags","+faststart"])
+    s(&["-c:v","libx264","-preset","ultrafast","-crf",crf,"-c:a","aac","-b:a","128k","-movflags","+faststart"])
 }
 
 pub fn default_video_args(hw: &HwEncoder) -> Vec<String> {
@@ -34,7 +34,7 @@ pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec
                 a
             }
             HwEncoder::Software => s(&[
-                "-c:v","libx264","-preset","fast","-crf","28",
+                "-c:v","libx264","-preset","ultrafast","-crf","28",
                 "-vf","scale='min(1280,iw)':-2","-c:a","aac","-b:a","96k","-movflags","+faststart",
             ]),
         }),
@@ -47,7 +47,7 @@ pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec
                 a
             }
             HwEncoder::Software => s(&[
-                "-c:v","libx264","-preset","fast","-crf","23",
+                "-c:v","libx264","-preset","ultrafast","-crf","23",
                 "-vf","scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2",
                 "-c:a","aac","-b:a","128k","-movflags","+faststart",
             ]),
@@ -59,7 +59,7 @@ pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec
                 a
             }
             HwEncoder::Software => s(&[
-                "-c:v","libx264","-preset","fast","-crf","23",
+                "-c:v","libx264","-preset","ultrafast","-crf","23",
                 "-vf","scale='min(1920,iw)':-2","-c:a","aac","-b:a","128k","-movflags","+faststart",
             ]),
         }),
@@ -70,7 +70,7 @@ pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec
                 a
             }
             HwEncoder::Software => s(&[
-                "-c:v","libx264","-preset","fast","-crf","26",
+                "-c:v","libx264","-preset","ultrafast","-crf","26",
                 "-vf","scale='min(1280,iw)':-2","-c:a","aac","-b:a","96k",
                 "-t","140","-movflags","+faststart",
             ]),
@@ -87,13 +87,13 @@ pub fn format_ffmpeg_args(kind: &MediaKind, fmt: &str, hw: &HwEncoder) -> Vec<St
         },
         (MediaKind::Video | MediaKind::ImageAnimated, "mkv") => match hw {
             HwEncoder::Vaapi    => { let mut a = vaapi_video("23"); a.retain(|x| x != "+faststart" && x != "-movflags"); a }
-            HwEncoder::Software => s(&["-c:v","libx264","-preset","fast","-crf","23","-c:a","aac","-b:a","128k"]),
+            HwEncoder::Software => s(&["-c:v","libx264","-preset","ultrafast","-crf","23","-c:a","aac","-b:a","128k"]),
         },
         (MediaKind::Video | MediaKind::ImageAnimated, "webm") =>
             s(&["-c:v","libvpx-vp9","-crf","33","-b:v","0","-c:a","libopus","-b:a","128k"]),
         (MediaKind::Video | MediaKind::ImageAnimated, "avi") => match hw {
             HwEncoder::Vaapi    => { let mut a = vaapi_video("23"); a.retain(|x| x != "+faststart" && x != "-movflags"); a.extend(s(&["-c:a","mp3","-b:a","128k"])); a }
-            HwEncoder::Software => s(&["-c:v","libx264","-preset","fast","-crf","23","-c:a","mp3","-b:a","128k"]),
+            HwEncoder::Software => s(&["-c:v","libx264","-preset","ultrafast","-crf","23","-c:a","mp3","-b:a","128k"]),
         },
         (MediaKind::Video | MediaKind::ImageAnimated, "gif") =>
             s(&["-vf","fps=15,scale='min(480,iw)':-1:flags=lanczos","-loop","0"]),

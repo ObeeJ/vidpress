@@ -86,6 +86,7 @@ export default function FileCard({ item }: { item: FileItem }) {
   const [exportedUrl, setExportedUrl] = useState<string | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollFailsRef = useRef(0);
 
   // Ingest & analyze on mount
   useEffect(() => {
@@ -108,6 +109,7 @@ export default function FileCard({ item }: { item: FileItem }) {
     pollRef.current = setInterval(async () => {
       try {
         const job = await getJob(item.jobId!);
+        pollFailsRef.current = 0;
         setJob(item.localUrl, job);
         if (job.status === "done" || job.status === "failed") {
           if (pollRef.current) clearInterval(pollRef.current);
@@ -115,11 +117,14 @@ export default function FileCard({ item }: { item: FileItem }) {
           if (job.status === "failed") toast(`Failed to theflate ${item.file.name}`, "error");
         }
       } catch {
-        // transient error — keep polling
+        if (++pollFailsRef.current >= 5) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          setError(item.localUrl, "Lost connection to server");
+        }
       }
     }, 800);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [item.jobId, item.job?.status, item.file.name, item.localUrl, setJob]);
+  }, [item.jobId, item.job?.status, item.file.name, item.localUrl, setJob, setError]);
 
   const profile = item.profile;
   const job = item.job;
@@ -353,7 +358,15 @@ export default function FileCard({ item }: { item: FileItem }) {
               </span>
             </div>
             <div style={{ height: 6, background: "#18181b", borderRadius: 99, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${job.progress}%`, background: "#ffffff", borderRadius: 99, transition: "width 0.4s ease" }} />
+              <div style={{
+                height: "100%",
+                width: job.progress > 0 ? `${job.progress}%` : "100%",
+                background: "#ffffff",
+                borderRadius: 99,
+                transition: job.progress > 0 ? "width 0.4s ease" : "none",
+                animation: job.progress === 0 ? "theflate-pulse 1.5s ease-in-out infinite" : "none",
+                opacity: job.progress === 0 ? undefined : 1,
+              }} />
             </div>
           </div>
         )}

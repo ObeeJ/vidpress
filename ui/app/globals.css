@@ -133,3 +133,8 @@ html, body {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+@keyframes theflate-pulse {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}

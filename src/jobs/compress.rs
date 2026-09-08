@@ -10,6 +10,10 @@ use crate::{
     webhook,
 };
 
+fn num_cpus() -> String {
+    std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2).to_string()
+}
+
 pub async fn run(
     id: String, input: String, output: String,
     profile: MediaProfile, preset: Option<String>, target_mb: Option<f64>,
@@ -59,7 +63,7 @@ pub async fn run(
         preset_ffmpeg_args(&preset, &hw).unwrap_or(profile.ffmpeg_args.clone())
     };
 
-    let mut args: Vec<String> = vec!["-y".into(), "-i".into(), input];
+    let mut args: Vec<String> = vec!["-y".into(), "-threads".into(), num_cpus(), "-i".into(), input];
     args.extend(ffmpeg_args);
     if duration > 0.1 {
         args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
@@ -67,6 +71,7 @@ pub async fn run(
     args.push(output.clone());
 
     let child = match Command::new("ffmpeg").args(&args)
+        .env("OMP_NUM_THREADS", num_cpus())
         .stderr(std::process::Stdio::piped()).spawn()
     {
         Ok(c) => c,
