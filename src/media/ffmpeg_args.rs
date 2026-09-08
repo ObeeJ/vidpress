@@ -14,12 +14,17 @@ fn vaapi_video(crf_equiv: &str) -> Vec<String> {
     ])
 }
 
+fn nvenc_video(cq: &str) -> Vec<String> {
+    s(&["-c:v","h264_nvenc","-preset","p1","-cq",cq,"-c:a","aac","-b:a","128k","-movflags","+faststart"])
+}
+
 fn sw_video(crf: &str) -> Vec<String> {
     s(&["-c:v","libx264","-preset","ultrafast","-crf",crf,"-c:a","aac","-b:a","128k","-movflags","+faststart"])
 }
 
 pub fn default_video_args(hw: &HwEncoder) -> Vec<String> {
     match hw {
+        HwEncoder::Nvenc    => nvenc_video("23"),
         HwEncoder::Vaapi    => vaapi_video("23"),
         HwEncoder::Software => sw_video("23"),
     }
@@ -28,6 +33,8 @@ pub fn default_video_args(hw: &HwEncoder) -> Vec<String> {
 pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec<String>> {
     match preset.as_deref() {
         Some("whatsapp") => Some(match hw {
+            HwEncoder::Nvenc => s(&["-c:v","h264_nvenc","-preset","p1","-cq","28",
+                "-vf","scale='min(1280,iw)':-2","-c:a","aac","-b:a","96k","-movflags","+faststart"]),
             HwEncoder::Vaapi => {
                 let mut a = s(&["-vaapi_device","/dev/dri/renderD128","-vf","scale='min(1280,iw)':-2,format=nv12,hwupload","-c:v","h264_vaapi","-qp","28"]);
                 a.extend(s(&["-c:a","aac","-b:a","96k","-movflags","+faststart"]));
@@ -39,6 +46,9 @@ pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec
             ]),
         }),
         Some("instagram_reel") => Some(match hw {
+            HwEncoder::Nvenc => s(&["-c:v","h264_nvenc","-preset","p1","-cq","23",
+                "-vf","scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2",
+                "-c:a","aac","-b:a","128k","-movflags","+faststart"]),
             HwEncoder::Vaapi => {
                 let mut a = s(&["-vaapi_device","/dev/dri/renderD128",
                     "-vf","scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,format=nv12,hwupload",
@@ -53,6 +63,8 @@ pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec
             ]),
         }),
         Some("web") => Some(match hw {
+            HwEncoder::Nvenc => s(&["-c:v","h264_nvenc","-preset","p1","-cq","23",
+                "-vf","scale='min(1920,iw)':-2","-c:a","aac","-b:a","128k","-movflags","+faststart"]),
             HwEncoder::Vaapi => {
                 let mut a = s(&["-vaapi_device","/dev/dri/renderD128","-vf","scale='min(1920,iw)':-2,format=nv12,hwupload","-c:v","h264_vaapi","-qp","23"]);
                 a.extend(s(&["-c:a","aac","-b:a","128k","-movflags","+faststart"]));
@@ -64,6 +76,8 @@ pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec
             ]),
         }),
         Some("twitter") => Some(match hw {
+            HwEncoder::Nvenc => s(&["-c:v","h264_nvenc","-preset","p1","-cq","26",
+                "-vf","scale='min(1280,iw)':-2","-c:a","aac","-b:a","96k","-t","140","-movflags","+faststart"]),
             HwEncoder::Vaapi => {
                 let mut a = s(&["-vaapi_device","/dev/dri/renderD128","-vf","scale='min(1280,iw)':-2,format=nv12,hwupload","-c:v","h264_vaapi","-qp","26"]);
                 a.extend(s(&["-c:a","aac","-b:a","96k","-t","140","-movflags","+faststart"]));
@@ -82,16 +96,19 @@ pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec
 pub fn format_ffmpeg_args(kind: &MediaKind, fmt: &str, hw: &HwEncoder) -> Vec<String> {
     match (kind, fmt) {
         (MediaKind::Video | MediaKind::ImageAnimated, "mp4"|"mov"|"m4v") => match hw {
+            HwEncoder::Nvenc    => nvenc_video("23"),
             HwEncoder::Vaapi    => vaapi_video("23"),
             HwEncoder::Software => sw_video("23"),
         },
         (MediaKind::Video | MediaKind::ImageAnimated, "mkv") => match hw {
+            HwEncoder::Nvenc    => { let mut a = nvenc_video("23"); a.retain(|x| x != "+faststart" && x != "-movflags"); a }
             HwEncoder::Vaapi    => { let mut a = vaapi_video("23"); a.retain(|x| x != "+faststart" && x != "-movflags"); a }
             HwEncoder::Software => s(&["-c:v","libx264","-preset","ultrafast","-crf","23","-c:a","aac","-b:a","128k"]),
         },
         (MediaKind::Video | MediaKind::ImageAnimated, "webm") =>
             s(&["-c:v","libvpx-vp9","-crf","33","-b:v","0","-c:a","libopus","-b:a","128k"]),
         (MediaKind::Video | MediaKind::ImageAnimated, "avi") => match hw {
+            HwEncoder::Nvenc    => { let mut a = nvenc_video("23"); a.retain(|x| x != "+faststart" && x != "-movflags"); a.extend(s(&["-c:a","mp3","-b:a","128k"])); a }
             HwEncoder::Vaapi    => { let mut a = vaapi_video("23"); a.retain(|x| x != "+faststart" && x != "-movflags"); a.extend(s(&["-c:a","mp3","-b:a","128k"])); a }
             HwEncoder::Software => s(&["-c:v","libx264","-preset","ultrafast","-crf","23","-c:a","mp3","-b:a","128k"]),
         },

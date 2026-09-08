@@ -44,6 +44,12 @@ pub async fn run(
         let total_kbps = ((mb * 8.0 * 1024.0) / profile.duration_secs.max(1.0)) as u64;
         let video_kbps = total_kbps.saturating_sub(128).max(100);
         match &hw {
+            HwEncoder::Nvenc => vec![
+                "-c:v".into(), "h264_nvenc".into(), "-preset".into(), "p1".into(),
+                "-b:v".into(), format!("{video_kbps}k"),
+                "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
+                "-movflags".into(), "+faststart".into(),
+            ],
             HwEncoder::Vaapi => vec![
                 "-vaapi_device".into(), "/dev/dri/renderD128".into(),
                 "-vf".into(), "format=nv12,hwupload".into(),
@@ -53,7 +59,7 @@ pub async fn run(
                 "-movflags".into(), "+faststart".into(),
             ],
             HwEncoder::Software => vec![
-                "-c:v".into(), "libx264".into(), "-preset".into(), "fast".into(),
+                "-c:v".into(), "libx264".into(), "-preset".into(), "ultrafast".into(),
                 "-b:v".into(), format!("{video_kbps}k"),
                 "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
                 "-movflags".into(), "+faststart".into(),
