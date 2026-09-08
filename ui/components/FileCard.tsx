@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useStore, FileItem } from "@/lib/store";
-import { ingestFile, analyzeFile, uploadFile, getJob, transcribeFile, exportToDestination } from "@/lib/api";
+import { ingestFile, analyzeFile, uploadFile, getJob, transcribeFile, exportToDestination, API } from "@/lib/api";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "@/lib/toast";
 
@@ -88,6 +88,7 @@ export default function FileCard({ item }: { item: FileItem }) {
   const [exportedUrl, setExportedUrl] = useState<string | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Ingest & analyze on mount
   useEffect(() => {
@@ -104,25 +105,26 @@ export default function FileCard({ item }: { item: FileItem }) {
       });
   }, [item.file, item.localUrl, item.profile, item.error, item.serverPath, setUploadPct, setServerPath, setProfile, setError]);
 
-  // Poll job status
+  // Poll job status + refresh preview URL while processing
   useEffect(() => {
     if (!item.jobId || item.job?.status === "done" || item.job?.status === "failed") return;
+    // Set preview URL immediately so video/audio can start loading partial data
+    setPreviewUrl(`${API}/preview/${item.jobId}?t=${Date.now()}`);
     pollRef.current = setInterval(async () => {
       const job = await getJob(item.jobId!);
       setJob(item.localUrl, job);
+      // Refresh preview src to pick up more bytes
+      if (job.status === "processing") {
+        setPreviewUrl(`${API}/preview/${item.jobId}?t=${Date.now()}`);
+      }
       if (job.status === "done" || job.status === "failed") {
         if (pollRef.current) clearInterval(pollRef.current);
-        if (job.status === "done") {
-          toast(`${item.file.name} successfully compressed`, "success");
-        }
-        if (job.status === "failed") {
-          toast(`Compression failed for ${item.file.name}`, "error");
-        }
+        setPreviewUrl(null);
+        if (job.status === "done") toast(`${item.file.name} successfully compressed`, "success");
+        if (job.status === "failed") toast(`Compression failed for ${item.file.name}`, "error");
       }
     }, 800);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [item.jobId, item.job?.status, item.file.name, item.localUrl, setJob]);
 
   const profile = item.profile;
@@ -135,7 +137,7 @@ export default function FileCard({ item }: { item: FileItem }) {
   const costEstimate = targetMb ? `$${(targetMb * 0.01).toFixed(3)}` : "—";
   const selectedPreset = item.preset ?? "original";
   const selectedFormat = item.outputFormat ?? profile?.output_ext ?? "";
-  const outputUrl = job?.status === "done" ? `/download/${job.id}` : null;
+  const outputUrl = job?.status === "done" ? `${API}/download/${job.id}` : null;
   const shareUrl = job?.status === "done" ? `${BASE_URL}/download/${job.id}` : null;
 
   async function compress() {
@@ -358,16 +360,29 @@ export default function FileCard({ item }: { item: FileItem }) {
           </button>
         )}
 
-        {/* Compression Active Status */}
+        {/* Compression Active Status + Live Preview */}
         {job && job.status !== "done" && job.status !== "failed" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a1a1aa" }}>
-              <span>Rust Worker executing FFmpeg H.265 stream...</span>
+              <span>Rust Worker executing FFmpeg stream...</span>
               <span>{job.progress}% · ETA {fmtTime(job.eta_secs)}</span>
             </div>
             <div style={{ height: 6, background: "#18181b", borderRadius: 99, overflow: "hidden" }}>
               <div style={{ height: "100%", width: `${job.progress}%`, background: "#ffffff", borderRadius: 99, transition: "width 0.4s ease" }} />
             </div>
+            {/* Live preview — shows partial output as ffmpeg writes it */}
+            {previewUrl && profile && job.progress > 5 && (
+              <div style={{ borderRadius: 8, overflow: "hidden", background: "#000", border: "1px solid #27272a" }}>
+                {profile.kind === "video" || profile.kind === "image_animated" ? (
+                  <video key={previewUrl} src={previewUrl} autoPlay muted playsInline controls style={{ width: "100%", maxHeight: 240, display: "block" }} />
+                ) : profile.kind?.includes("audio") ? (
+                  <audio key={previewUrl} src={previewUrl} controls style={{ width: "100%", padding: 12 }} />
+                ) : (
+                  <img key={previewUrl} src={previewUrl} alt="preview" style={{ width: "100%", maxHeight: 240, objectFit: "contain", display: "block" }} />
+                )}
+                <div style={{ padding: "6px 10px", fontSize: 10, color: "#52525b" }}>Live preview — encoding in progress</div>
+              </div>
+            )}
           </div>
         )}
 

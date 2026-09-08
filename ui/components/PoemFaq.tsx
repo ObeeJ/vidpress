@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 
 interface PoemFaqProps {
   showTitle?: boolean;
@@ -22,7 +21,7 @@ export default function PoemFaq({ showTitle = true }: PoemFaqProps) {
             Startup velocity is defined by market gravity. If you are creating high value for an acute pain point, inherent demand pulls the product from your hands, creating natural explosive growth.
           </p>
           <p>
-            <strong>VPX Vision:</strong> Eliminate the friction and financial penalty of digital media handling across the internet. Media files consume over 75% of global bandwidth. We build the lightest, fastest Rust microservice media pipeline that enables instant compression, conversion, and transcription without complex cloud infrastructure.
+            <strong>theflate Vision:</strong> Deflate digital media overhead across the internet. Media files consume over 75% of global bandwidth. We build the lightest, fastest Rust microservice media pipeline that enables instant compression, conversion, and transcription without complex cloud infrastructure.
           </p>
         </div>
       ),
@@ -60,12 +59,12 @@ export default function PoemFaq({ showTitle = true }: PoemFaqProps) {
     {
       id: "solution",
       category: "P.O.E.M Solution",
-      question: "What is the VPX solution and how does it compare to existing options?",
+      question: "What is the theflate solution and how does it compare to existing options?",
       summary: "High-performance Rust media pipeline with H.265 compression, OpenAI Whisper, and link downloads.",
       content: (
         <div style={{ display: "flex", flexDirection: "column", gap: 12, lineHeight: 1.6 }}>
           <p>
-            VPX is a unified, high-performance media engine written in Rust and powered by FFmpeg + Whisper AI.
+            theflate is a unified, high-performance media engine written in Rust and powered by FFmpeg + Whisper AI.
           </p>
           <div style={{ border: "1px solid #27272a", borderRadius: 8, overflow: "hidden", marginTop: 4 }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, textAlign: "left" }}>
@@ -73,7 +72,7 @@ export default function PoemFaq({ showTitle = true }: PoemFaqProps) {
                 <tr style={{ background: "#121215", borderBottom: "1px solid #27272a" }}>
                   <th style={{ padding: "8px 12px", color: "#ffffff", fontWeight: 600 }}>Alternative</th>
                   <th style={{ padding: "8px 12px", color: "#ffffff", fontWeight: 600 }}>The Compromise</th>
-                  <th style={{ padding: "8px 12px", color: "#ffffff", fontWeight: 600 }}>VPX Advantage</th>
+                  <th style={{ padding: "8px 12px", color: "#ffffff", fontWeight: 600 }}>theflate Advantage</th>
                 </tr>
               </thead>
               <tbody>
@@ -113,7 +112,7 @@ export default function PoemFaq({ showTitle = true }: PoemFaqProps) {
               <strong style={{ color: "#ffffff" }}>1. High-Intent Utility Engine:</strong> Free, instant web tools (URL Downloader for YouTube/TikTok/X, QR file sharing) drive organic search traffic and word-of-mouth adoption.
             </li>
             <li>
-              <strong style={{ color: "#ffffff" }}>2. Developer API Hook:</strong> Programmatic REST API keys (`x-api-key`) allow developers to embed VPX directly into their backends for user media uploads, creating locked-in recurring SaaS volume.
+              <strong style={{ color: "#ffffff" }}>2. Developer API Hook:</strong> Programmatic REST API keys (`x-api-key`) allow developers to embed theflate directly into their backends for user media uploads, creating locked-in recurring SaaS volume.
             </li>
             <li>
               <strong style={{ color: "#ffffff" }}>3. Open Core & Self-Hosting:</strong> Provide white-label options and open source/self-hostable options for enterprise security and developer community trust.
@@ -125,11 +124,11 @@ export default function PoemFaq({ showTitle = true }: PoemFaqProps) {
     {
       id: "faq-retention",
       category: "Security & Retention",
-      question: "How long are uploaded files retained on VPX nodes?",
+      question: "How long are uploaded files retained on theflate nodes?",
       summary: "Automated purge schedules protect privacy and storage hygiene.",
       content: (
         <p style={{ color: "#a1a1aa", lineHeight: 1.6 }}>
-          Anonymous uploads are automatically permanently deleted after 24 hours. Premium and API plan outputs are retained for 7 days or until deleted manually via API call. VPX does not retain or sell user media assets.
+          Anonymous uploads are automatically permanently deleted after 24 hours. Premium and API plan outputs are retained for 7 days or until deleted manually via API call. theflate does not retain or sell user media assets.
         </p>
       ),
     },
@@ -160,7 +159,7 @@ export default function PoemFaq({ showTitle = true }: PoemFaqProps) {
             Problem. Solution. Strategy.
           </h2>
           <p style={{ fontSize: 14, color: "#a1a1aa", maxWidth: 560, margin: "8px auto 0" }}>
-            Explosive growth stems from solving visceral problems with relentless clarity. Explore the foundational premise of VPX.
+            Explosive growth stems from solving visceral problems with relentless clarity. Explore the foundational premise of theflate.
           </p>
         </div>
       )}

@@ -6,3 +6,5 @@ pub mod keys;
 pub mod download_url;
 pub mod transcribe;
 pub mod export;
+pub mod capture;
+pub mod preview;

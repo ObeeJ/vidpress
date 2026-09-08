@@ -6,15 +6,17 @@ use crate::{
     jobs::model::JobStatus,
     media::detect::MediaProfile,
     media::ffmpeg_args::preset_ffmpeg_args,
-    state::{Db, JobStore},
+    state::{Db, HwEncoder, JobStore},
     webhook,
 };
 
 pub async fn run(
     id: String, input: String, output: String,
     profile: MediaProfile, preset: Option<String>,
-    jobs: JobStore, db: Db,
+    jobs: JobStore, db: Db, hw: HwEncoder,
+    sem: std::sync::Arc<tokio::sync::Semaphore>,
 ) {
+    let _permit = sem.acquire_owned().await;
     let update = |status: JobStatus, progress: u8, eta: u64, compressed: u64| {
         let mut store = jobs.lock().unwrap();
         if let Some(job) = store.get_mut(&id) {
@@ -33,7 +35,7 @@ pub async fn run(
 
     let progress_file = format!("/tmp/{id}_progress");
     let duration = profile.duration_secs;
-    let ffmpeg_args = preset_ffmpeg_args(&preset).unwrap_or(profile.ffmpeg_args.clone());
+    let ffmpeg_args = preset_ffmpeg_args(&preset, &hw).unwrap_or(profile.ffmpeg_args.clone());
 
     let mut args: Vec<String> = vec!["-y".into(), "-i".into(), input];
     args.extend(ffmpeg_args);

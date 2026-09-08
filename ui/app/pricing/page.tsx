@@ -95,7 +95,7 @@ const WHITELABEL_OPTIONS = [
     name: "White-Label Brand",
     price: 19,
     period: "mo",
-    desc: "Host VPX on your own custom domain with custom logos.",
+    desc: "Host theflate on your own custom domain with custom logos.",
   },
   {
     id: "whitelabel_source",

@@ -3,7 +3,7 @@ import "./globals.css";
 import { Toaster } from "@/lib/toast";
 
 export const metadata: Metadata = {
-  title: "VPX | High-Velocity Media Pipeline",
+  title: "theflate | Deflate Media. Maximum Velocity.",
   description: "Compress, convert, download, and transcribe any media instantly with sub-second Rust execution.",
   icons: {
     icon: "/icon.svg",

@@ -1,0 +1,34 @@
+services:
+  theflate-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: theflate-api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - VIDPRESS_STORAGE=/tmp/theflate_output
+      - VIDPRESS_DB=/var/lib/theflate/theflate.db
+      - VIDPRESS_CORS_ORIGIN=http://localhost:3000
+    volumes:
+      - theflate-data:/var/lib/theflate
+      - theflate-storage:/tmp/theflate_output
+
+  theflate-ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    container_name: theflate-ui
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_BASE_URL=http://localhost:3000
+      - NEXT_PUBLIC_API_URL=http://localhost:8080
+    depends_on:
+      - theflate-api
+
+volumes:
+  theflate-data:
+  theflate-storage:

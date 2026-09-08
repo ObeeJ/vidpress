@@ -1,5 +1,6 @@
 use serde::Serialize;
 use tokio::process::Command;
+use crate::{media::ffmpeg_args::default_video_args, state::HwEncoder};
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -28,6 +29,10 @@ pub struct MediaProfile {
 }
 
 pub async fn detect(path: &str) -> Result<MediaProfile, String> {
+    detect_with_hw(path, &HwEncoder::Software).await
+}
+
+pub async fn detect_with_hw(path: &str, hw: &HwEncoder) -> Result<MediaProfile, String> {
     let out = Command::new("ffprobe")
         .args(["-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", path])
         .output().await.map_err(|e| e.to_string())?;
@@ -59,7 +64,7 @@ pub async fn detect(path: &str) -> Result<MediaProfile, String> {
         return Ok(MediaProfile {
             kind: MediaKind::ImageAnimated, codec_name: video_codec, duration_secs,
             size_bytes, width, height,
-            ffmpeg_args: s(&["-c:v","libx264","-preset","fast","-crf","28","-an","-movflags","+faststart"]),
+            ffmpeg_args: s(&["-c:v","libx264","-preset","fast","-crf","28","-an","-movflags","+faststart"]), // animated gif/webp — no audio, sw only
             output_ext: ext.into(),
             available_formats: vec!["gif".into(), "webp".into(), "mp4".into()],
             estimated_output_mb: size_mb * 0.15,
@@ -90,7 +95,7 @@ pub async fn detect(path: &str) -> Result<MediaProfile, String> {
         return Ok(MediaProfile {
             kind: MediaKind::Video, codec_name: video_codec, duration_secs,
             size_bytes, width, height,
-            ffmpeg_args: s(&["-c:v","libx264","-preset","fast","-crf","23","-c:a","aac","-b:a","128k","-movflags","+faststart"]),
+            ffmpeg_args: default_video_args(hw),
             output_ext: ext,
             available_formats: vec!["mp4".into(),"mov".into(),"mkv".into(),"webm".into(),"avi".into()],
             estimated_output_mb: size_mb * 0.15,

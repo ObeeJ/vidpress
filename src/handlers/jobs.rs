@@ -25,8 +25,12 @@ pub async fn download(req: Request) -> Response {
     match job {
         Some(j) if matches!(j.status, JobStatus::Done) => {
             match std::fs::read(&j.output_path) {
-                Ok(bytes) => Response::binary(200, bytes, content_type_for(&j.output_path)),
-                Err(_)    => Response { status: 404, body: r#"{"error":"output file missing"}"#.into(), ..Default::default() },
+                Ok(bytes) => {
+                    let mut res = Response::binary(200, bytes, content_type_for(&j.output_path));
+                    res.headers.push(("cache-control".into(), "public, max-age=86400, immutable".into()));
+                    res
+                }
+                Err(_) => Response { status: 404, body: r#"{"error":"output file missing"}"#.into(), ..Default::default() },
             }
         }
         Some(_) => Response { status: 409, body: r#"{"error":"job not done yet"}"#.into(), ..Default::default() },

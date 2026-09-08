@@ -5,7 +5,7 @@ use crate::{
     auth::auth_and_rate,
     db::upsert_job,
     jobs::model::{DestinationConfig, Job, JobStatus},
-    media::{detect::detect, ffmpeg_args::format_ffmpeg_args},
+    media::{detect::detect_with_hw, ffmpeg_args::format_ffmpeg_args},
     state::{AppState, storage_dir},
 };
 
@@ -27,13 +27,13 @@ pub async fn upload(req: Request) -> Response {
     let output_format = body["output_format"].as_str().map(String::from);
     let destination: Option<DestinationConfig> = serde_json::from_value(body["destination"].clone()).ok();
 
-    let mut profile = match detect(&path).await {
+    let mut profile = match detect_with_hw(&path, &state.hw).await {
         Ok(p)  => p,
         Err(e) => return Response { status: 415, body: format!(r#"{{"error":"{e}"}}"#).into(), ..Default::default() },
     };
     if let Some(ref fmt) = output_format {
         profile.output_ext = fmt.clone();
-        profile.ffmpeg_args = format_ffmpeg_args(&profile.kind, fmt);
+        profile.ffmpeg_args = format_ffmpeg_args(&profile.kind, fmt, &state.hw);
     }
 
     let id = Uuid::new_v4().to_string();
@@ -53,9 +53,9 @@ pub async fn upload(req: Request) -> Response {
     upsert_job(&state.db, &job);
     state.jobs.lock().unwrap().insert(id.clone(), job);
 
-    let (jobs, db, id2) = (state.jobs.clone(), state.db.clone(), id.clone());
+    let (jobs, db, id2, hw, sem) = (state.jobs.clone(), state.db.clone(), id.clone(), state.hw.clone(), state.job_sem.clone());
     tokio::spawn(async move {
-        crate::jobs::compress::run(id2, path, output_path, profile, preset, jobs, db).await;
+        crate::jobs::compress::run(id2, path, output_path, profile, preset, jobs, db, hw, sem).await;
     });
 
     Response {

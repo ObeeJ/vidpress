@@ -5,11 +5,13 @@ mod media;
 mod handlers;
 mod state;
 mod webhook;
+mod ws;
 
 use std::{collections::HashMap, sync::{Arc, Mutex}, time::Duration};
 use glideapi::{App, Config};
 use rusqlite::Connection;
-use state::{AppState, cors_origin, db_path};
+use tokio::sync::Semaphore;
+use state::{AppState, cors_origin, db_path, detect_hw};
 
 #[tokio::main]
 async fn main() {
@@ -18,19 +20,30 @@ async fn main() {
     let conn = Connection::open(db_path()).expect("cannot open db");
     db::init_db(&conn);
 
-    // Reload jobs from DB into memory on startup
     let jobs_map: HashMap<_, _> = db::load_all_jobs(&conn)
         .into_iter()
         .map(|j| (j.id.clone(), j))
         .collect();
 
+    let hw      = detect_hw().await;
+    let max_jobs = std::env::var("THEFLATE_MAX_JOBS")
+        .ok().and_then(|v| v.parse().ok()).unwrap_or(4usize);
+
     let state = AppState {
-        jobs: Arc::new(Mutex::new(jobs_map)),
-        db:   Arc::new(Mutex::new(conn)),
+        jobs:     Arc::new(Mutex::new(jobs_map)),
+        db:       Arc::new(Mutex::new(conn)),
+        hw,
+        job_sem:  Arc::new(Semaphore::new(max_jobs)),
+        captures: jobs::capture::new_store(),
+        streams:  jobs::stream::new_store(),
     };
 
     let origin = cors_origin();
     tracing::info!("CORS origin: {origin}");
+
+    // WebSocket live-stream server on :8081
+    let ws_state = Arc::new(state.clone());
+    tokio::spawn(async move { ws::listen(ws_state).await });
 
     App::new()
         .config(Config {
