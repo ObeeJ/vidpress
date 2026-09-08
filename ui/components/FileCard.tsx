@@ -1,22 +1,31 @@
 "use client";
-import { useEffect, useRef } from "react";
+
+import { useEffect, useRef, useState } from "react";
 import { useStore, FileItem } from "@/lib/store";
-import { ingestFile, analyzeFile, uploadFile, getJob } from "@/lib/api";
+import { ingestFile, analyzeFile, uploadFile, getJob, transcribeFile, exportToDestination } from "@/lib/api";
 import { QRCodeSVG } from "qrcode.react";
-import { Tooltip } from "@/app/page";
 import { toast } from "@/lib/toast";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 
 const PRESETS = [
-  { id: "original", label: "Original", desc: "Best quality" },
-  { id: "web", label: "Web", desc: "Fast load, any browser" },
-  { id: "whatsapp", label: "WhatsApp", desc: "Under 16MB" },
-  { id: "instagram_reel", label: "Instagram", desc: "9:16 vertical" },
-  { id: "twitter", label: "Twitter/X", desc: "Max 2min 20s" },
+  { id: "original", label: "Original", desc: "Max quality ratio" },
+  { id: "web", label: "Web", desc: "Fast browser streaming" },
+  { id: "whatsapp", label: "WhatsApp", desc: "Under 16MB cap" },
+  { id: "instagram_reel", label: "Instagram", desc: "9:16 Vertical" },
+  { id: "twitter", label: "Twitter/X", desc: "Optimized H.264" },
+];
+
+const DESTINATIONS = [
+  { id: "s3", name: "AWS S3 Bucket", placeholder: "my-s3-media-bucket" },
+  { id: "r2", name: "Cloudflare R2", placeholder: "my-r2-bucket" },
+  { id: "supabase", name: "Supabase Storage", placeholder: "my-supabase-bucket" },
+  { id: "gdrive", name: "Google Drive", placeholder: "Google Drive Folder" },
+  { id: "dropbox", name: "Dropbox", placeholder: "Dropbox Folder" },
 ];
 
 function fmt(bytes: number) {
+  if (!bytes) return "0 B";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1048576).toFixed(1)} MB`;
@@ -26,26 +35,36 @@ function fmtTime(secs: number) {
   if (!secs || secs <= 0) return "instant";
   if (secs < 5) return "a few seconds";
   if (secs < 60) return `~${secs}s`;
-  if (secs < 3600) return `~${Math.round(secs / 60)}min`;
-  return `~${(secs / 3600).toFixed(1)}hr`;
+  if (secs < 3600) return `~${Math.round(secs / 60)}m`;
+  return `~${(secs / 3600).toFixed(1)}h`;
 }
 
 function kindIcon(kind: string) {
-  if (kind?.includes("audio")) return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-  );
-  if (kind?.includes("image")) return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
-  );
+  if (kind?.includes("audio")) {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" />
+      </svg>
+    );
+  }
+  if (kind?.includes("image")) {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" />
+      </svg>
+    );
+  }
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polygon points="23 7 16 12 23 17 23 7" /><rect x="1" y="5" width="15" height="14" rx="2" />
+    </svg>
   );
 }
 
 const stat = (label: string, value: string, color?: string) => (
   <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-    <span style={{ fontSize: 15, fontWeight: 700, color: color ?? "var(--text)" }}>{value}</span>
-    <span style={{ fontSize: 11, color: "var(--muted)" }}>{label}</span>
+    <span style={{ fontSize: 14, fontWeight: 700, color: color ?? "#ffffff" }}>{value}</span>
+    <span style={{ fontSize: 11, color: "#71717a" }}>{label}</span>
   </div>
 );
 
@@ -56,16 +75,34 @@ export default function FileCard({ item }: { item: FileItem }) {
   const setTargetMb = useStore((s) => s.setTargetMb);
   const setPreset = useStore((s) => s.setPreset);
   const setOutputFormat = useStore((s) => s.setOutputFormat);
+
+  const [transcription, setTranscription] = useState<string | null>(null);
+  const [transcribing, setTranscribing] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
+  
+  // Destination Export state
+  const [showExport, setShowExport] = useState(false);
+  const [exportProvider, setExportProvider] = useState("s3");
+  const [exportBucket, setExportBucket] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportedUrl, setExportedUrl] = useState<string | null>(null);
+
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Ingest → analyze on mount
+  // Ingest & analyze on mount
   useEffect(() => {
     if (item.profile || item.error || item.serverPath) return;
     ingestFile(item.file, (pct) => setUploadPct(item.localUrl, pct))
-      .then((path) => { setServerPath(item.localUrl, path); return analyzeFile(path); })
+      .then((path) => {
+        setServerPath(item.localUrl, path);
+        return analyzeFile(path);
+      })
       .then((p) => setProfile(item.localUrl, p))
-      .catch((e) => { setError(item.localUrl, `Upload failed: ${e}`); toast(`Upload failed: ${e}`, "error"); });
-  }, []);
+      .catch((e) => {
+        setError(item.localUrl, `Upload failed: ${e}`);
+        toast(`Upload failed: ${e}`, "error");
+      });
+  }, [item.file, item.localUrl, item.profile, item.error, item.serverPath, setUploadPct, setServerPath, setProfile, setError]);
 
   // Poll job status
   useEffect(() => {
@@ -74,24 +111,19 @@ export default function FileCard({ item }: { item: FileItem }) {
       const job = await getJob(item.jobId!);
       setJob(item.localUrl, job);
       if (job.status === "done" || job.status === "failed") {
-        clearInterval(pollRef.current!);
-        // Browser notification
-        if (job.status === "done" && Notification.permission === "granted") {
-          new Notification("Compression done!", { body: `${item.file.name} is ready to download`, icon: "/favicon.ico" });
-          toast(`${item.file.name} compressed successfully`, "success");
+        if (pollRef.current) clearInterval(pollRef.current);
+        if (job.status === "done") {
+          toast(`${item.file.name} successfully compressed`, "success");
         }
-        if (job.status === "failed") toast(`Compression failed for ${item.file.name}`, "error");
+        if (job.status === "failed") {
+          toast(`Compression failed for ${item.file.name}`, "error");
+        }
       }
     }, 800);
-    return () => clearInterval(pollRef.current!);
-  }, [item.jobId, item.job?.status]);
-
-  // Request notification permission once
-  useEffect(() => {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [item.jobId, item.job?.status, item.file.name, item.localUrl, setJob]);
 
   const profile = item.profile;
   const job = item.job;
@@ -106,228 +138,386 @@ export default function FileCard({ item }: { item: FileItem }) {
   const outputUrl = job?.status === "done" ? `/download/${job.id}` : null;
   const shareUrl = job?.status === "done" ? `${BASE_URL}/download/${job.id}` : null;
 
-  const statusColor: Record<string, string> = {
-    queued: "#f59e0b", processing: "var(--accent)", done: "var(--green)", failed: "var(--red)"
-  };
-
   async function compress() {
     if (!item.serverPath) return;
     try {
-      const { job_id } = await uploadFile(item.serverPath, selectedPreset === "original" ? undefined : selectedPreset, undefined, selectedFormat !== profile?.output_ext ? selectedFormat : undefined);
+      const { job_id } = await uploadFile(
+        item.serverPath,
+        selectedPreset === "original" ? undefined : selectedPreset,
+        undefined,
+        selectedFormat !== profile?.output_ext ? selectedFormat : undefined
+      );
       setJobId(item.localUrl, job_id);
-      toast("Compression started", "info");
+      toast("Compression job queued", "info");
     } catch (e) {
       setError(item.localUrl, String(e));
       toast(String(e), "error");
     }
   }
 
-  return (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16, overflow: "hidden" }}>
+  async function runTranscription() {
+    if (!job?.id) return;
+    setTranscribing(true);
+    try {
+      const res = await transcribeFile(job.id);
+      setTranscription(res.text);
+      toast("Whisper AI transcription complete", "success");
+    } catch (e) {
+      toast(`Transcription failed: ${e}`, "error");
+    } finally {
+      setTranscribing(false);
+    }
+  }
 
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid var(--border)", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, color: "var(--muted)" }}>
+  async function handleDestinationExport() {
+    if (!job?.id) return;
+    setExporting(true);
+    try {
+      const res = await exportToDestination(job.id, exportProvider, {
+        bucket: exportBucket || "vpx-media-bucket",
+        targetPath: `exports/${item.file.name}`,
+      });
+      setExportedUrl(res.remote_url);
+      toast(`Exported directly to ${exportProvider.toUpperCase()}`, "success");
+    } catch (e) {
+      toast(`Cloud export failed: ${e}`, "error");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  return (
+    <div style={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 12, overflow: "hidden" }}>
+      {/* Card Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #18181b", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, color: "#a1a1aa" }}>
           {kindIcon(profile?.kind ?? "")}
-          <span style={{ fontWeight: 600, fontSize: 13, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ fontWeight: 600, fontSize: 13, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {item.file.name}
           </span>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           {job?.status && (
-            <span style={{ fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 20, background: statusColor[job.status] + "22", color: statusColor[job.status], border: `1px solid ${statusColor[job.status]}44` }}>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "2px 8px",
+                borderRadius: 4,
+                background: job.status === "done" ? "#10b98122" : job.status === "failed" ? "#ef444422" : "#18181b",
+                color: job.status === "done" ? "#10b981" : job.status === "failed" ? "#ef4444" : "#a1a1aa",
+                border: `1px solid ${job.status === "done" ? "#10b98144" : job.status === "failed" ? "#ef444444" : "#27272a"}`,
+              }}
+            >
               {job.status}
             </span>
           )}
-          <button onClick={() => removeFile(item.localUrl)} aria-label="Remove file"
-            style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 2 }}>×</button>
+          <button
+            onClick={() => removeFile(item.localUrl)}
+            aria-label="Remove item"
+            style={{ background: "none", border: "none", color: "#71717a", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 2 }}
+          >
+            ×
+          </button>
         </div>
       </div>
 
       <div style={{ padding: "18px", display: "flex", flexDirection: "column", gap: 18 }}>
-
-        {/* Error */}
+        {/* Error Notification */}
         {item.error && (
-          <p role="alert" style={{ color: "var(--red)", fontSize: 12, background: "#ef444411", padding: "10px 14px", borderRadius: 10 }}>
+          <div style={{ color: "#ef4444", fontSize: 12, background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.2)", padding: "10px 14px", borderRadius: 8 }}>
             {item.error}
-          </p>
+          </div>
         )}
 
-        {/* Upload progress */}
+        {/* Upload & Analysis Progress */}
         {!profile && !item.error && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)" }}>
-              <span>{item.serverPath ? "Analyzing…" : "Uploading to server…"}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a1a1aa" }}>
+              <span>{item.serverPath ? "Analyzing media metrics..." : "Uploading stream to Rust worker..."}</span>
               {!item.serverPath && <span>{item.uploadPct ?? 0}%</span>}
             </div>
-            <div style={{ height: 4, background: "var(--surface2)", borderRadius: 99, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: item.serverPath ? "100%" : `${item.uploadPct ?? 0}%`, background: item.serverPath ? "var(--green)" : "var(--accent)", borderRadius: 99, transition: "width 0.3s ease" }} />
+            <div style={{ height: 4, background: "#18181b", borderRadius: 99, overflow: "hidden" }}>
+              <div
+                style={{
+                  height: "100%",
+                  width: item.serverPath ? "100%" : `${item.uploadPct ?? 0}%`,
+                  background: item.serverPath ? "#10b981" : "#ffffff",
+                  borderRadius: 99,
+                  transition: "width 0.3s ease",
+                }}
+              />
             </div>
           </div>
         )}
 
-        {/* Profile stats */}
+        {/* Profile Statistics Grid */}
         {profile && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, background: "var(--surface2)", borderRadius: 12, padding: "14px 16px" }}>
-            {stat("Original size", fmt(profile.size_bytes))}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "12px 14px" }}>
+            {stat("Raw Size", fmt(profile.size_bytes))}
             {stat("Codec", profile.codec_name)}
             {profile.duration_secs > 0 ? stat("Duration", fmtTime(Math.round(profile.duration_secs))) : stat("Type", profile.kind)}
-            {profile.width ? stat("Dimensions", `${profile.width}×${profile.height}`) : <div />}
+            {profile.width ? stat("Dimensions", `${profile.width}×${profile.height}`) : stat("Output Ext", profile.output_ext.toUpperCase())}
           </div>
         )}
 
-        {/* Output format picker */}
+        {/* Output Format Picker */}
         {profile && !job && profile.available_formats?.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ fontSize: 12, color: "var(--muted)" }}>Output format
-              <Tooltip text="The file type you'll get back. MP4 works everywhere. Leave it on default if you're unsure." />
-            </span>
+            <span style={{ fontSize: 12, color: "#a1a1aa", fontWeight: 500 }}>Target Output Format</span>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {profile.available_formats.map((fmt) => (
-                <button key={fmt} onClick={() => setOutputFormat(item.localUrl, fmt)}
+              {profile.available_formats.map((fmtExt) => (
+                <button
+                  key={fmtExt}
+                  onClick={() => setOutputFormat(item.localUrl, fmtExt)}
                   style={{
-                    padding: "5px 14px", borderRadius: 8, cursor: "pointer",
-                    fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px",
-                    border: `1px solid ${selectedFormat === fmt ? "var(--accent)" : "var(--border)"}`,
-                    background: selectedFormat === fmt ? "var(--accent)22" : "var(--surface2)",
-                    color: selectedFormat === fmt ? "var(--accent)" : "var(--muted)",
-                    transition: "all 0.15s",
-                  }}>
-                  {fmt}
-                  {fmt === profile.output_ext && (
-                    <span style={{ fontSize: 9, marginLeft: 4, opacity: 0.6 }}>default</span>
-                  )}
+                    padding: "4px 12px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontSize: 11,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                    border: `1px solid ${selectedFormat === fmtExt ? "#ffffff" : "#27272a"}`,
+                    background: selectedFormat === fmtExt ? "#18181b" : "#09090b",
+                    color: selectedFormat === fmtExt ? "#ffffff" : "#71717a",
+                  }}
+                >
+                  {fmtExt}
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Preset selector */}
+        {/* Preset Selector */}
         {profile && !job && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ fontSize: 12, color: "var(--muted)" }}>Output preset
-              <Tooltip text="A ready-made setting for a specific platform. Pick WhatsApp if you're sending via WhatsApp, Instagram for Reels, Web for websites. Leave on Original if unsure." />
-            </span>
+            <span style={{ fontSize: 12, color: "#a1a1aa", fontWeight: 500 }}>Encoding Profile Preset</span>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
               {PRESETS.map((p) => (
-                <button key={p.id} onClick={() => setPreset(item.localUrl, p.id)}
-                  style={{ padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 600, border: `1px solid ${selectedPreset === p.id ? "var(--accent)" : "var(--border)"}`, background: selectedPreset === p.id ? "var(--accent)22" : "var(--surface2)", color: selectedPreset === p.id ? "var(--accent)" : "var(--muted)", transition: "all 0.15s" }}>
-                  {p.label}
-                  <span style={{ display: "block", fontSize: 10, fontWeight: 400, marginTop: 1 }}>{p.desc}</span>
+                <button
+                  key={p.id}
+                  onClick={() => setPreset(item.localUrl, p.id)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: 6,
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    border: `1px solid ${selectedPreset === p.id ? "#ffffff" : "#27272a"}`,
+                    background: selectedPreset === p.id ? "#18181b" : "#09090b",
+                    color: selectedPreset === p.id ? "#ffffff" : "#71717a",
+                    textAlign: "left",
+                  }}
+                >
+                  <div>{p.label}</div>
+                  <div style={{ fontSize: 10, fontWeight: 400, color: "#71717a", marginTop: 2 }}>{p.desc}</div>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Target size slider */}
+        {/* Target Size Slider */}
         {profile && !job && selectedPreset === "original" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "var(--muted)", fontSize: 12 }}>Target size
-                <Tooltip text="Drag left to make the file smaller (slightly lower quality). Drag right to keep it closer to the original. The minimum is 1% of the original size." />
-              </span>
+              <span style={{ color: "#a1a1aa", fontSize: 12 }}>Custom Target Compression Threshold</span>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontWeight: 700, fontSize: 15 }}>{targetMb.toFixed(1)} MB</span>
-                <span style={{ fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, background: savingPct > 0 ? "#22c55e22" : "var(--surface2)", color: savingPct > 0 ? "var(--green)" : "var(--muted)" }}>−{savingPct}%</span>
+                <span style={{ fontWeight: 700, fontSize: 14, color: "#ffffff" }}>{targetMb.toFixed(1)} MB</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "#10b98122", color: "#10b981", border: "1px solid #10b98144" }}>
+                  −{savingPct}%
+                </span>
               </div>
             </div>
-            <input type="range" min={minMb} max={originalMb} step={0.1} value={targetMb}
+            <input
+              type="range"
+              min={minMb}
+              max={originalMb}
+              step={0.1}
+              value={targetMb}
               onChange={(e) => setTargetMb(item.localUrl, Number(e.target.value))}
-              style={{ width: "100%", accentColor: "var(--accent)", cursor: "pointer" }} />
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--muted)" }}>
-              <span>Min {minMb.toFixed(1)} MB (1%)</span>
-              <span>{originalMb.toFixed(1)} MB (original)</span>
-            </div>
+              style={{ width: "100%", accentColor: "#ffffff", cursor: "pointer" }}
+            />
           </div>
         )}
 
-        {/* Estimates */}
+        {/* Estimates Bar */}
         {profile && !job && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "var(--surface2)", borderRadius: 12, padding: "14px 16px" }}>
-              {stat("Est. cost", costEstimate, "var(--accent)")}
-              {stat("Time to compress", fmtTime(profile.estimated_time_secs))}
-              {stat("Time to download", fmtTime(downloadTimeSecs))}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "10px 14px" }}>
+            {stat("Estimated Egress Cost", costEstimate, "#10b981")}
+            {stat("Compress Time", fmtTime(profile.estimated_time_secs))}
+            {stat("Download Time", fmtTime(downloadTimeSecs))}
           </div>
         )}
 
-        {/* Compress */}
+        {/* Compress Action */}
         {profile && !job && (
-          <button onClick={compress}
-            style={{ width: "100%", padding: "13px", borderRadius: 12, border: "none", background: "var(--accent)", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", transition: "background 0.15s" }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--accent-hover)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--accent)")}>
-            Compress →
+          <button onClick={compress} className="vpx-button-primary" style={{ width: "100%", padding: "10px" }}>
+            Trigger Compression Pipeline →
           </button>
         )}
 
-        {/* Compression progress */}
+        {/* Compression Active Status */}
         {job && job.status !== "done" && job.status !== "failed" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--muted)" }}>
-              <span>Compressing…</span>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a1a1aa" }}>
+              <span>Rust Worker executing FFmpeg H.265 stream...</span>
               <span>{job.progress}% · ETA {fmtTime(job.eta_secs)}</span>
             </div>
-            <div style={{ height: 6, background: "var(--surface2)", borderRadius: 99, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${job.progress}%`, background: "var(--accent)", borderRadius: 99, transition: "width 0.4s ease" }} />
+            <div style={{ height: 6, background: "#18181b", borderRadius: 99, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${job.progress}%`, background: "#ffffff", borderRadius: 99, transition: "width 0.4s ease" }} />
             </div>
           </div>
         )}
 
-        {/* Done */}
+        {/* Job Done State */}
         {job?.status === "done" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "var(--surface2)", borderRadius: 12, padding: "14px 16px" }}>
-              {stat("Before", fmt(job.original_bytes))}
-              {stat("After", fmt(job.compressed_bytes), "var(--green)")}
-              {stat("Saved", `${(((job.original_bytes - job.compressed_bytes) / job.original_bytes) * 100).toFixed(1)}%`, "var(--green)")}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "12px 14px" }}>
+              {stat("Original Size", fmt(job.original_bytes))}
+              {stat("Compressed Size", fmt(job.compressed_bytes), "#10b981")}
+              {stat("Storage Reduction", `${(((job.original_bytes - job.compressed_bytes) / job.original_bytes) * 100).toFixed(1)}%`, "#10b981")}
             </div>
 
-            {shareUrl && (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                <p style={{ fontSize: 12, color: "var(--muted)" }}>Scan to download on any device</p>
-                <div style={{ background: "#fff", padding: 10, borderRadius: 12 }}>
-                  <QRCodeSVG value={shareUrl} size={120} />
-                </div>
-                <p style={{ fontSize: 10, color: "var(--muted)", wordBreak: "break-all", textAlign: "center" }}>{shareUrl}</p>
-              </div>
-            )}
-
-            {/* Preview */}
+            {/* Media Output Preview */}
             {outputUrl && profile && (
-              <div style={{ borderRadius: 12, overflow: "hidden", background: "var(--surface2)" }}>
+              <div style={{ borderRadius: 8, overflow: "hidden", background: "#000000", border: "1px solid #27272a" }}>
                 {profile.kind === "video" || profile.kind === "image_animated" ? (
-                  <video src={outputUrl} controls style={{ width: "100%", maxHeight: 240, display: "block" }} />
+                  <video src={outputUrl} controls style={{ width: "100%", maxHeight: 280, display: "block" }} />
                 ) : profile.kind?.includes("audio") ? (
-                  <audio src={outputUrl} controls style={{ width: "100%", padding: "12px" }} />
-                ) : profile.kind?.includes("image") ? (
-                  <img src={outputUrl} alt="preview" style={{ width: "100%", maxHeight: 240, objectFit: "contain", display: "block" }} />
-                ) : null}
+                  <audio src={outputUrl} controls style={{ width: "100%", padding: 12 }} />
+                ) : (
+                  <img src={outputUrl} alt="preview" style={{ width: "100%", maxHeight: 280, objectFit: "contain", display: "block" }} />
+                )}
               </div>
             )}
 
+            {/* Whisper Transcription Trigger */}
+            {(profile?.kind === "video" || profile?.kind?.includes("audio")) && (
+              <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>OpenAI Whisper Transcription</div>
+                  <button
+                    onClick={runTranscription}
+                    disabled={transcribing}
+                    className="vpx-button-secondary"
+                    style={{ fontSize: 11, padding: "4px 12px" }}
+                  >
+                    {transcribing ? "Transcribing..." : transcription ? "Re-transcribe" : "Generate Text"}
+                  </button>
+                </div>
+                {transcription && (
+                  <div style={{ background: "#000000", border: "1px solid #18181b", borderRadius: 6, padding: 12, fontSize: 12, color: "#a1a1aa", maxHeight: 120, overflowY: "auto", whiteSpace: "pre-wrap" }}>
+                    {transcription}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Cloud Storage Destination Export Box */}
+            <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>Cloud Storage Export Destination</div>
+                  <div style={{ fontSize: 11, color: "#71717a" }}>Stream output to AWS S3, Cloudflare R2, Supabase, Google Drive, or Dropbox</div>
+                </div>
+                <button
+                  onClick={() => setShowExport(!showExport)}
+                  className="vpx-button-secondary"
+                  style={{ fontSize: 11, padding: "4px 12px" }}
+                >
+                  {showExport ? "Hide Target" : "Configure Destination"}
+                </button>
+              </div>
+
+              {showExport && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 4 }}>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {DESTINATIONS.map((dest) => (
+                      <button
+                        key={dest.id}
+                        onClick={() => setExportProvider(dest.id)}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 6,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          border: `1px solid ${exportProvider === dest.id ? "#ffffff" : "#27272a"}`,
+                          background: exportProvider === dest.id ? "#18181b" : "#000000",
+                          color: exportProvider === dest.id ? "#ffffff" : "#71717a",
+                        }}
+                      >
+                        {dest.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      value={exportBucket}
+                      onChange={(e) => setExportBucket(e.target.value)}
+                      placeholder={DESTINATIONS.find((d) => d.id === exportProvider)?.placeholder ?? "target-name"}
+                      style={{
+                        flex: 1,
+                        padding: "8px 12px",
+                        borderRadius: 6,
+                        background: "#000000",
+                        border: "1px solid #27272a",
+                        color: "#ffffff",
+                        fontSize: 12,
+                        outline: "none",
+                      }}
+                    />
+                    <button
+                      onClick={handleDestinationExport}
+                      disabled={exporting}
+                      className="vpx-button-primary"
+                      style={{ fontSize: 12, padding: "6px 14px", whiteSpace: "nowrap" }}
+                    >
+                      {exporting ? "Exporting..." : "Send File"}
+                    </button>
+                  </div>
+
+                  {exportedUrl && (
+                    <div style={{ fontSize: 11, color: "#10b981", background: "#10b98111", border: "1px solid #10b98133", padding: "8px 12px", borderRadius: 6, wordBreak: "break-all" }}>
+                      Successfully exported: <a href={exportedUrl} target="_blank" rel="noreferrer" style={{ color: "#10b981", fontWeight: 700 }}>{exportedUrl}</a>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Actions Bar */}
             <div style={{ display: "flex", gap: 10 }}>
               <button
-                onClick={() => navigator.share?.({ title: item.file.name, url: shareUrl ?? "" }).catch(() => {})}
-                style={{ flex: 1, padding: "11px", borderRadius: 12, border: "1px solid var(--border)", background: "none", color: "var(--text)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                Share
+                onClick={() => setShowQrModal(!showQrModal)}
+                className="vpx-button-secondary"
+                style={{ flex: 1 }}
+              >
+                {showQrModal ? "Hide QR Code" : "QR Share"}
               </button>
               {outputUrl && (
                 <a href={outputUrl} download style={{ flex: 1, textDecoration: "none" }}>
-                  <button style={{ width: "100%", padding: "11px", borderRadius: 12, border: "none", background: "var(--green)", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                    Download
+                  <button className="vpx-button-primary" style={{ width: "100%" }}>
+                    Download Compressed File
                   </button>
                 </a>
               )}
             </div>
-          </div>
-        )}
 
-        {job?.status === "failed" && (
-          <p role="alert" style={{ color: "var(--red)", fontSize: 12, background: "#ef444411", padding: "10px 14px", borderRadius: 10 }}>
-            Compression failed. The file may be corrupted or an unsupported format.
-          </p>
+            {/* QR Modal */}
+            {showQrModal && shareUrl && (
+              <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12, color: "#a1a1aa" }}>Scan camera to download on mobile device</span>
+                <div style={{ background: "#ffffff", padding: 10, borderRadius: 8 }}>
+                  <QRCodeSVG value={shareUrl} size={140} />
+                </div>
+                <span style={{ fontSize: 10, color: "#71717a", wordBreak: "break-all", textAlign: "center" }}>{shareUrl}</span>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

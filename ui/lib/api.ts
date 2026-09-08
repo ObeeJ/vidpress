@@ -1,4 +1,4 @@
-const API = "http://localhost:8080";
+export const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
 export async function ingestFile(file: File, onProgress?: (pct: number) => void): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -42,6 +42,36 @@ export async function uploadFile(path: string, preset?: string, webhookUrl?: str
 
 export async function getJob(id: string) {
   const r = await fetch(`${API}/jobs/${id}`);
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function transcribeFile(jobId: string) {
+  const r = await fetch(`${API}/transcribe`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ job_id: jobId }),
+  });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function exportToDestination(
+  jobId: string,
+  provider: string,
+  options?: { bucket?: string; endpoint?: string; targetPath?: string }
+) {
+  const r = await fetch(`${API}/export`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      job_id: jobId,
+      provider,
+      bucket: options?.bucket,
+      endpoint: options?.endpoint,
+      target_path: options?.targetPath,
+    }),
+  });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }

@@ -259,7 +259,9 @@ dependencies = [
 
 [[package]]
 name = "glideapi"
-version = "0.1.1"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d17a9395b7046890fd43f0ffbda1330edc1ecad118bb6b8d28ca41fb35fbb577"
 dependencies = [
  "async-trait",
  "bytes",
@@ -280,7 +282,9 @@ dependencies = [
 
 [[package]]
 name = "glideapi_macros"
-version = "0.1.1"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acc23442e61ba5c82b4f6064e12b4affb8aff32e8822400cdf553f3503895098"
 dependencies = [
  "linkme",
  "proc-macro2",
@@ -1268,6 +1272,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "theflate"
+version = "0.1.0"
+dependencies = [
+ "glideapi",
+ "glideapi_macros",
+ "hex",
+ "linkme",
+ "rand",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1538,25 +1561,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "vidpress"
-version = "0.1.0"
-dependencies = [
- "glideapi",
- "glideapi_macros",
- "hex",
- "linkme",
- "rand",
- "reqwest",
- "rusqlite",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
 
 [[package]]
 name = "want"

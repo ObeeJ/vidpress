@@ -1,11 +1,11 @@
 [package]
-name = "vidpress"
+name = "theflate"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-glideapi = { path = "../../glideapi" }
-glideapi_macros = { path = "../../glideapi/glideapi_macros" }
+glideapi = "0.1.3"
+glideapi_macros = "0.1.3"
 linkme = "0.3"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }

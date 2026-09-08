@@ -1,4 +1,4 @@
-# vidpress
+# theflate
 
 > Compress, convert, download, and transcribe any media — instantly. Built for developers and non-technical users alike.
 
@@ -27,7 +27,7 @@
 
 ```bash
 # Backend (port 8080)
-cd /path/to/vidpress
+cd /path/to/theflate
 cargo run
 
 # Frontend (port 3000)
@@ -39,8 +39,8 @@ bun run dev
 
 | Variable | Default | Description |
 |---|---|---|
-| `VIDPRESS_STORAGE` | `/tmp/vidpress_output` | Where compressed files are stored |
-| `VIDPRESS_DB` | `/tmp/vidpress.db` | SQLite database path |
+| `THEFLATE_STORAGE` | `/tmp/theflate_output` | Where compressed files are stored |
+| `THEFLATE_DB` | `/tmp/theflate.db` | SQLite database path |
 | `NEXT_PUBLIC_BASE_URL` | `http://localhost:3000` | Public URL for QR codes and sharing |
 
 ## API
@@ -88,7 +88,7 @@ curl -X POST http://localhost:8080/ingest \
 curl -X POST http://localhost:8080/upload \
   -H "content-type: application/json" \
   -H "x-api-key: vp_YOUR_KEY" \
-  -d '{"path":"/tmp/vidpress_output/abc_video.mp4","preset":"web","webhook_url":"https://yourapp.com/hook"}'
+  -d '{"path":"/tmp/theflate_output/abc_video.mp4","preset":"web","webhook_url":"https://yourapp.com/hook"}'
 
 # 3. Poll
 curl http://localhost:8080/jobs/JOB_ID -H "x-api-key: vp_YOUR_KEY"
@@ -108,14 +108,14 @@ When a job completes, vidpress POSTs to your `webhook_url`:
   "media_kind": "video",
   "original_bytes": 408449822,
   "compressed_bytes": 46124172,
-  "output_path": "/tmp/vidpress_output/uuid_output.mp4",
+  "output_path": "/tmp/theflate_output/uuid_output.mp4",
   "duration_secs": 138.3,
   "progress": 100,
   "eta_secs": 0
 }
 ```
 
-Header: `x-vidpress-event: job.done`
+Header: `x-theflate-event: job.done`
 
 Respond with HTTP 2xx to acknowledge. Retries 3 times with exponential backoff on failure.
 
@@ -144,8 +144,8 @@ Each white-label domain is **exclusively locked** to one account. No two compani
 ## Nginx setup
 
 ```bash
-sudo cp nginx.conf /etc/nginx/sites-available/vidpress
-sudo ln -s /etc/nginx/sites-available/vidpress /etc/nginx/sites-enabled/
+sudo cp nginx.conf /etc/nginx/sites-available/theflate
+sudo ln -s /etc/nginx/sites-available/theflate /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 
 # HTTPS (replace yourdomain.com)
@@ -158,7 +158,7 @@ Already installed. Runs hourly, deletes output files older than 24h, marks stale
 
 ```bash
 crontab -l | grep vidpress
-# 0 * * * * /path/to/vidpress/cleanup.sh
+# 0 * * * * /path/to/theflate/cleanup.sh
 ```
 
 ## Deployment

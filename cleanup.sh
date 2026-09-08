@@ -1,9 +1,9 @@
 #!/bin/bash
-# vidpress cleanup — delete output files older than 24h
-# Add to crontab: 0 * * * * /home/obeej/projects/vidpress/cleanup.sh >> /tmp/vidpress-cleanup.log 2>&1
+# theflate cleanup — delete output files older than 24h
+# Add to crontab: 0 * * * * /home/obeej/projects/theflate/cleanup.sh >> /tmp/theflate-cleanup.log 2>&1
 
-STORAGE="${VIDPRESS_STORAGE:-/tmp/vidpress_output}"
-DB="${VIDPRESS_DB:-/tmp/vidpress.db}"
+STORAGE="${THEFLATE_STORAGE:-/tmp/theflate_output}"
+DB="${THEFLATE_DB:-/tmp/theflate.db}"
 
 echo "[$(date)] Starting cleanup..."
 
@@ -12,16 +12,17 @@ find "$STORAGE" -type f -mmin +1440 -delete
 echo "[$(date)] Deleted old output files"
 
 # Mark stale jobs as failed in DB (processing > 2h = stuck)
-python3 - <<'EOF'
-import sqlite3, time
-conn = sqlite3.connect("$DB")
+# M4 fix: pass $DB as argument — single-quoted heredoc never expands variables
+python3 -c "
+import sqlite3, time, sys
+conn = sqlite3.connect(sys.argv[1])
 stale = int(time.time()) - 7200
-conn.execute("UPDATE jobs SET status='failed' WHERE status='processing' AND created_at < ?", (stale,))
+cur = conn.execute(\"UPDATE jobs SET status='failed' WHERE status='processing' AND created_at < ?\", (stale,))
 conn.commit()
-print(f"Marked stale jobs as failed")
+print(f'Marked {cur.rowcount} stale jobs as failed')
 conn.close()
-EOF
+" "$DB"
 
 # Delete /tmp ingest files older than 2h
-find /tmp -name "vidpress_*" -type f -mmin +120 -delete
+find /tmp -name "theflate_*" -type f -mmin +120 -delete
 echo "[$(date)] Cleanup done"

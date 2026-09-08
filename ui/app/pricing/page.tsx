@@ -1,261 +1,400 @@
 "use client";
+
 import { useState, useRef } from "react";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 const PLANS = [
   {
-    id: "free", name: "Free", price: 0, period: "forever", tag: null,
-    color: "#ffffff22", border: "#333",
-    features: ["10 compressions / day", "200MB file limit", "All formats & presets", "QR code sharing", "24h file retention", "Whisper base transcription"],
-    cta: "Get started",
+    id: "free",
+    name: "Sandbox Free",
+    monthlyPrice: 0,
+    annualPrice: 0,
+    tag: "Instant Sandbox",
+    description: "For casual users and initial API evaluation.",
+    limits: "10 compressions/day • 200MB file limit • Standard queue speed",
+    features: [
+      "All output formats (MP4, WebM, MP3, WebP)",
+      "24-hour temporary vault retention",
+      "Whisper base transcription model",
+      "QR code mobile downloads",
+    ],
+    cta: "Start Free",
   },
   {
-    id: "premium", name: "Premium", price: 2, period: "mo", tag: "Best value",
-    color: "#7c3aed22", border: "#7c3aed",
-    features: ["Unlimited compressions", "2GB file limit", "API access (300 req/min)", "Webhooks", "YouTube / IG / TikTok / X download", "Whisper medium transcription", "SRT / VTT subtitle export", "Batch jobs (10 at once)", "Metadata stripping", "Video thumbnail extraction", "7-day file retention", "Priority processing"],
-    cta: "Get Premium",
+    id: "premium",
+    name: "Pro Membership",
+    monthlyPrice: 9,
+    annualPrice: 7,
+    tag: "Most Popular",
+    description: "For content creators, social managers, and heavy individual users.",
+    limits: "Unlimited web compressions • 2GB file limit • Priority queue",
+    features: [
+      "YouTube, Instagram, TikTok, X URL downloader",
+      "Whisper medium high-accuracy transcription",
+      "Subtitle SRT/VTT export",
+      "7-day retention vault",
+      "Batch parallel processing (10 files at once)",
+      "API access (300 req/min)",
+    ],
+    cta: "Upgrade to Pro",
   },
   {
-    id: "api_starter", name: "API Starter", price: 5, period: "mo", tag: "For devs",
-    color: "#06b6d422", border: "#06b6d4",
-    features: ["Everything in Premium", "120 req/min", "5,000 jobs/month", "Webhook HMAC signing", "API usage dashboard", "Email support"],
-    cta: "Get Starter",
+    id: "api_starter",
+    name: "API Starter",
+    monthlyPrice: 19,
+    annualPrice: 15,
+    tag: "For Developers",
+    description: "Programmatic compression API for early-stage apps and SaaS.",
+    limits: "120 req/min • 5,000 API jobs/month",
+    features: [
+      "Everything in Pro Membership",
+      "Webhook notifications with HMAC signing",
+      "API usage telemetry dashboard",
+      "Custom output file naming templates",
+    ],
+    cta: "Issue Starter Key",
   },
   {
-    id: "api_growth", name: "API Growth", price: 15, period: "mo", tag: "For startups",
-    color: "#8b5cf622", border: "#8b5cf6",
-    features: ["Everything in Starter", "600 req/min", "50,000 jobs/month", "Custom output filenames", "Dedicated job queue", "Priority support"],
-    cta: "Get Growth",
+    id: "api_growth",
+    name: "API Growth",
+    monthlyPrice: 49,
+    annualPrice: 39,
+    tag: "For Scaleups",
+    description: "High-throughput API for growing media platforms and UGC apps.",
+    limits: "600 req/min • 50,000 API jobs/month",
+    features: [
+      "Everything in API Starter",
+      "Dedicated Rust worker queue dispatch",
+      "99.9% uptime target SLA",
+      "Priority developer email support",
+    ],
+    cta: "Issue Growth Key",
   },
   {
-    id: "api_scale", name: "API Scale", price: 49, period: "mo", tag: "Production",
-    color: "#f59e0b22", border: "#f59e0b",
-    features: ["Everything in Growth", "3,000 req/min", "Unlimited jobs", "99.9% SLA", "Slack support", "Custom retention"],
-    cta: "Get Scale",
+    id: "api_scale",
+    name: "API Scale",
+    monthlyPrice: 149,
+    annualPrice: 119,
+    tag: "Production",
+    description: "Enterprise volume with dedicated worker isolation and SLAs.",
+    limits: "3,000 req/min • 250,000 API jobs/month",
+    features: [
+      "Everything in API Growth",
+      "Isolated ECS worker fleet scaling",
+      "Custom vault retention policies",
+      "24/7 dedicated support & SLA",
+    ],
+    cta: "Issue Scale Key",
   },
 ];
 
-const WL = [
+const WHITELABEL_OPTIONS = [
   {
-    id: "whitelabel_basic", name: "Basic", price: 19, period: "mo",
-    features: ["Remove vidpress branding", "Your logo + colors", "Custom domain (exclusive)", "All API Scale features", "DNS setup guide"],
+    id: "whitelabel_basic",
+    name: "White-Label Brand",
+    price: 19,
+    period: "mo",
+    desc: "Host VPX on your own custom domain with custom logos.",
   },
   {
-    id: "whitelabel_pro", name: "Pro", price: 49, period: "mo",
-    features: ["Everything in Basic", "Custom email domain", "Your API key namespace", "Custom pricing page", "Resell to your users", "Dedicated support"],
-  },
-  {
-    id: "whitelabel_source", name: "Source", price: 299, period: "one-time",
-    features: ["Full source code", "Self-host forever", "No monthly fees", "Modify anything", "1 year of updates", "No revenue share"],
+    id: "whitelabel_source",
+    name: "Self-Host Source Code",
+    price: 299,
+    period: "one-time",
+    desc: "Complete Rust backend & Next.js UI source code license.",
   },
 ];
-
-function Tick() {
-  return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" style={{ flexShrink: 0, marginTop: 2 }}><polyline points="20 6 9 17 4 12"/></svg>;
-}
 
 export default function PricingPage() {
+  const [annual, setAnnual] = useState(true);
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [wlDomain, setWlDomain] = useState("");
   const [wlBrand, setWlBrand] = useState("");
-  const [loading, setLoading] = useState<string | null>(null);
-  const [result, setResult] = useState<{ key: string; plan: string } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [issuedKey, setIssuedKey] = useState<{ key: string; plan: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const printRef = useRef<HTMLDivElement>(null);
 
-  async function getKey(planId: string) {
-    if (!name.trim()) { setError("Enter a name for your key first"); return; }
-    if (planId.startsWith("whitelabel") && !wlDomain.trim()) { setError("Enter your custom domain"); return; }
-    setLoading(planId); setError(null);
-    const r = await fetch("http://localhost:8080/keys", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, plan: planId, white_label_domain: wlDomain || undefined, white_label_brand: wlBrand || undefined }),
-    });
-    const data = await r.json();
-    if (!r.ok) { setError(data.error); setLoading(null); return; }
-    setResult(data); setLoading(null);
-  }
-
-  function downloadPage() {
-    window.print();
+  async function handleKeyIssuance(planId: string) {
+    if (!name.trim()) {
+      setError("Enter a developer/app name first");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const r = await fetch("http://localhost:8080/keys", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name,
+          plan: planId,
+          white_label_domain: wlDomain || undefined,
+          white_label_brand: wlBrand || undefined,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Failed to create API key");
+      setIssuedKey(data);
+      setSelectedPlan(null);
+    } catch (e: unknown) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
-    <main ref={printRef} style={{ minHeight: "100vh", background: "var(--bg)", color: "var(--text)", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#000000" }}>
+      <Navbar />
 
-      {/* Hero */}
-      <div style={{ textAlign: "center", padding: "80px 20px 48px", background: "radial-gradient(ellipse at top, #7c3aed18 0%, transparent 60%)" }}>
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#7c3aed22", border: "1px solid #7c3aed44", borderRadius: 20, padding: "4px 14px", fontSize: 12, color: "#a78bfa", marginBottom: 20 }}>
-          <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#22c55e", animation: "pulse 2s infinite" }} />
-          Ridiculously affordable
-        </div>
-        <h1 style={{ fontSize: 48, fontWeight: 900, letterSpacing: "-2px", marginBottom: 12, lineHeight: 1.1 }}>
-          One tool.<br />Every format.
-        </h1>
-        <p style={{ color: "var(--muted)", fontSize: 16, maxWidth: 480, margin: "0 auto 32px" }}>
-          Compress, convert, download, and transcribe any media. Start free, upgrade when you need more.
-        </p>
-        <button onClick={downloadPage}
-          style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface)", color: "var(--muted)", fontSize: 13, cursor: "pointer", fontWeight: 600 }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          Download pricing PDF
-        </button>
-      </div>
-
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 20px 80px" }}>
-
-        {/* Key name input */}
-        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "20px 24px", marginBottom: 40, display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <div style={{ flex: 1, minWidth: 200 }}>
-            <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Key name <span style={{ color: "var(--red)" }}>*</span></p>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. My App, Production"
-              style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text)", fontSize: 13, outline: "none" }} />
+      <main style={{ flex: 1, maxWidth: 1100, width: "100%", margin: "0 auto", padding: "60px 20px 80px" }}>
+        
+        {/* Header Banner */}
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 12px", borderRadius: 9999, background: "#18181b", border: "1px solid #27272a", fontSize: 11, fontWeight: 700, color: "#a1a1aa", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 16 }}>
+            SaaS & Membership Tiers
           </div>
-          {error && <p style={{ fontSize: 12, color: "var(--red)", alignSelf: "center" }}>{error}</p>}
-        </div>
-
-        {/* Plans grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16, marginBottom: 64 }}>
-          {PLANS.map((p) => (
-            <div key={p.id} style={{ background: "var(--surface)", border: `1px solid ${p.border}`, borderRadius: 20, padding: "24px 20px", display: "flex", flexDirection: "column", gap: 20, position: "relative", transition: "transform 0.15s", cursor: "default" }}
-              onMouseEnter={(e) => (e.currentTarget.style.transform = "translateY(-2px)")}
-              onMouseLeave={(e) => (e.currentTarget.style.transform = "translateY(0)")}>
-              {p.tag && (
-                <div style={{ position: "absolute", top: -11, left: "50%", transform: "translateX(-50%)", background: p.border, color: "#fff", fontSize: 10, fontWeight: 800, padding: "2px 12px", borderRadius: 20, whiteSpace: "nowrap" }}>{p.tag}</div>
-              )}
-              <div>
-                <p style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>{p.name}</p>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
-                  <span style={{ fontSize: 13, color: "var(--muted)", marginTop: 4 }}>$</span>
-                  <span style={{ fontSize: 36, fontWeight: 900, letterSpacing: "-1px", color: p.border }}>{p.price}</span>
-                  <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 2 }}>/{p.period}</span>
-                </div>
-              </div>
-              <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 9, flex: 1 }}>
-                {p.features.map((f) => (
-                  <li key={f} style={{ display: "flex", gap: 8, fontSize: 12, color: "var(--muted)", alignItems: "flex-start" }}>
-                    <Tick /><span style={{ color: "var(--text)" }}>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <button onClick={() => getKey(p.id)} disabled={loading === p.id}
-                style={{ padding: "11px", borderRadius: 12, border: `1px solid ${p.border}`, fontWeight: 700, fontSize: 12, cursor: "pointer", background: p.id === "premium" ? p.border : "transparent", color: p.id === "premium" ? "#fff" : p.border, transition: "all 0.15s", opacity: loading === p.id ? 0.7 : 1 }}>
-                {loading === p.id ? "Creating…" : p.cta}
-              </button>
-            </div>
-          ))}
-        </div>
-
-        {/* White-label section */}
-        <div style={{ marginBottom: 64 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 8 }}>
-            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-            <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: "2px", textTransform: "uppercase", color: "var(--muted)", whiteSpace: "nowrap" }}>White-label</p>
-            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
-          </div>
-          <p style={{ fontSize: 13, color: "var(--muted)", textAlign: "center", marginBottom: 32 }}>
-            Your brand. Your domain. <strong style={{ color: "var(--text)" }}>Exclusively yours</strong> — no two companies share the same domain.
+          <h1 style={{ fontSize: 40, fontWeight: 900, letterSpacing: "-1.5px", color: "#ffffff", marginBottom: 12 }}>
+            Simple. Transparent. Zero Overhead.
+          </h1>
+          <p style={{ fontSize: 15, color: "#a1a1aa", maxWidth: 560, margin: "0 auto 28px" }}>
+            Start with our free sandbox or deploy high-throughput API keys for production workflows.
           </p>
 
-          {/* WL inputs */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, maxWidth: 600, margin: "0 auto 32px" }}>
-            <div>
-              <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Your domain</p>
-              <input value={wlDomain} onChange={(e) => setWlDomain(e.target.value)} placeholder="compress.yourbrand.com"
-                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text)", fontSize: 13, outline: "none" }} />
+          {/* Billing Interval Toggle */}
+          <div style={{ display: "inline-flex", alignItems: "center", background: "#09090b", border: "1px solid #27272a", borderRadius: 9999, padding: 4 }}>
+            <button
+              onClick={() => setAnnual(false)}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 9999,
+                border: "none",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                background: !annual ? "#ffffff" : "transparent",
+                color: !annual ? "#000000" : "#a1a1aa",
+                transition: "all 0.15s ease",
+              }}
+            >
+              Monthly Billing
+            </button>
+            <button
+              onClick={() => setAnnual(true)}
+              style={{
+                padding: "6px 16px",
+                borderRadius: 9999,
+                border: "none",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                background: annual ? "#ffffff" : "transparent",
+                color: annual ? "#000000" : "#a1a1aa",
+                transition: "all 0.15s ease",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <span>Annual Billing</span>
+              <span style={{ fontSize: 9, fontWeight: 800, padding: "1px 6px", borderRadius: 4, background: "#10b98122", color: "#10b981", border: "1px solid #10b98144" }}>
+                SAVE 20%
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Issued Key Banner Modal */}
+        {issuedKey && (
+          <div style={{ background: "#121215", border: "1px solid #10b981", borderRadius: 12, padding: "24px", marginBottom: 40 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#ffffff" }}>API Key Generated Successfully</div>
+              <button onClick={() => setIssuedKey(null)} style={{ background: "none", border: "none", color: "#a1a1aa", cursor: "pointer", fontSize: 18 }}>×</button>
             </div>
-            <div>
-              <p style={{ fontSize: 12, color: "var(--muted)", marginBottom: 6 }}>Brand name</p>
-              <input value={wlBrand} onChange={(e) => setWlBrand(e.target.value)} placeholder="YourBrand Compress"
-                style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid var(--border)", background: "var(--surface2)", color: "var(--text)", fontSize: 13, outline: "none" }} />
+            <p style={{ fontSize: 13, color: "#a1a1aa", marginBottom: 14 }}>
+              Copy your key now. Store it securely in your environment variables as <code style={{ background: "#000000", padding: "2px 6px", borderRadius: 4, color: "#ffffff" }}>x-api-key</code>.
+            </p>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <input
+                readOnly
+                value={issuedKey.key}
+                style={{ flex: 1, padding: "10px 14px", borderRadius: 8, background: "#000000", border: "1px solid #27272a", color: "#10b981", fontFamily: "monospace", fontSize: 14 }}
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(issuedKey.key);
+                  alert("Copied to clipboard!");
+                }}
+                className="vpx-button-primary"
+              >
+                Copy Key
+              </button>
             </div>
           </div>
+        )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, maxWidth: 800, margin: "0 auto" }}>
-            {WL.map((w) => (
-              <div key={w.id} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: "24px 20px", display: "flex", flexDirection: "column", gap: 20 }}>
+        {/* Developer Name Modal Trigger */}
+        {selectedPlan && (
+          <div style={{ background: "#09090b", border: "1px solid #3f3f46", borderRadius: 12, padding: "24px", marginBottom: 40 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: "#ffffff" }}>Configure Key for Plan: {selectedPlan.toUpperCase()}</h3>
+                <p style={{ fontSize: 12, color: "#a1a1aa" }}>Enter your details to generate your instantaneous access key.</p>
+              </div>
+              <button onClick={() => setSelectedPlan(null)} style={{ background: "none", border: "none", color: "#a1a1aa", cursor: "pointer", fontSize: 18 }}>×</button>
+            </div>
+
+            {error && (
+              <div style={{ fontSize: 12, color: "#ef4444", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", padding: "10px", borderRadius: 8, marginBottom: 14 }}>
+                {error}
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#a1a1aa" }}>
+                Developer / Organization Name *
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Acme Media Systems"
+                  style={{ padding: "10px 14px", borderRadius: 8, background: "#000000", border: "1px solid #27272a", color: "#ffffff", outline: "none" }}
+                />
+              </label>
+
+              {selectedPlan.startsWith("whitelabel") && (
+                <>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#a1a1aa" }}>
+                    Custom White-Label Domain
+                    <input
+                      value={wlDomain}
+                      onChange={(e) => setWlDomain(e.target.value)}
+                      placeholder="compress.yourdomain.com"
+                      style={{ padding: "10px 14px", borderRadius: 8, background: "#000000", border: "1px solid #27272a", color: "#ffffff", outline: "none" }}
+                    />
+                  </label>
+                  <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12, color: "#a1a1aa" }}>
+                    Brand Name Override
+                    <input
+                      value={wlBrand}
+                      onChange={(e) => setWlBrand(e.target.value)}
+                      placeholder="YourBrand Media"
+                      style={{ padding: "10px 14px", borderRadius: 8, background: "#000000", border: "1px solid #27272a", color: "#ffffff", outline: "none" }}
+                    />
+                  </label>
+                </>
+              )}
+
+              <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                <button
+                  onClick={() => handleKeyIssuance(selectedPlan)}
+                  disabled={loading}
+                  className="vpx-button-primary"
+                  style={{ flex: 1 }}
+                >
+                  {loading ? "Generating..." : "Confirm & Issue API Key"}
+                </button>
+                <button onClick={() => setSelectedPlan(null)} className="vpx-button-secondary">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Pricing Tier Grid (Structured 5-Tier Layout) */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 20, marginBottom: 60 }}>
+          {PLANS.map((p) => {
+            const price = annual ? p.annualPrice : p.monthlyPrice;
+            const isHighlight = p.id === "premium" || p.id === "api_growth";
+            return (
+              <div
+                key={p.id}
+                style={{
+                  background: isHighlight ? "#09090b" : "#000000",
+                  border: `1px solid ${isHighlight ? "#ffffff" : "#27272a"}`,
+                  borderRadius: 12,
+                  padding: "24px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  position: "relative",
+                }}
+              >
                 <div>
-                  <p style={{ fontSize: 11, color: "var(--muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>White-label {w.name}</p>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 2 }}>
-                    <span style={{ fontSize: 13, color: "var(--muted)" }}>$</span>
-                    <span style={{ fontSize: 36, fontWeight: 900, letterSpacing: "-1px" }}>{w.price}</span>
-                    <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 2 }}>/{w.period}</span>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                    <span style={{ fontSize: 18, fontWeight: 800, color: "#ffffff" }}>{p.name}</span>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: "#18181b", color: "#a1a1aa", border: "1px solid #27272a" }}>
+                      {p.tag}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 4, marginBottom: 8 }}>
+                    <span style={{ fontSize: 32, fontWeight: 900, color: "#ffffff" }}>${price}</span>
+                    <span style={{ fontSize: 13, color: "#71717a" }}>/ month</span>
+                  </div>
+
+                  <p style={{ fontSize: 12, color: "#a1a1aa", marginBottom: 16, lineHeight: 1.5 }}>
+                    {p.description}
+                  </p>
+
+                  <div style={{ background: "#121215", border: "1px solid #18181b", borderRadius: 6, padding: "8px 12px", fontSize: 11, fontWeight: 600, color: "#ffffff", marginBottom: 16 }}>
+                    {p.limits}
+                  </div>
+
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
+                    {p.features.map((feat, idx) => (
+                      <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12, color: "#a1a1aa" }}>
+                        <span style={{ color: "#ffffff", fontWeight: 700 }}>•</span>
+                        <span>{feat}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 9, flex: 1 }}>
-                  {w.features.map((f) => (
-                    <li key={f} style={{ display: "flex", gap: 8, fontSize: 12, alignItems: "flex-start" }}>
-                      <Tick /><span style={{ color: "var(--text)" }}>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-                <button onClick={() => getKey(w.id)} disabled={loading === w.id}
-                  style={{ padding: "11px", borderRadius: 12, border: "1px solid var(--accent)", fontWeight: 700, fontSize: 12, cursor: "pointer", background: "var(--accent)", color: "#fff", opacity: loading === w.id ? 0.7 : 1 }}>
-                  {loading === w.id ? "Creating…" : `Get ${w.name}`}
+
+                <button
+                  onClick={() => setSelectedPlan(p.id)}
+                  className={isHighlight ? "vpx-button-primary" : "vpx-button-secondary"}
+                  style={{ width: "100%", padding: "10px" }}
+                >
+                  {p.cta}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* White-Label Options Section */}
+        <div style={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 12, padding: "32px" }}>
+          <h2 style={{ fontSize: 22, fontWeight: 800, color: "#ffffff", marginBottom: 8 }}>
+            White-Label & Source Code Licensing
+          </h2>
+          <p style={{ fontSize: 13, color: "#a1a1aa", marginBottom: 24 }}>
+            For enterprise platforms needing full custom domain branding or self-hosting capability.
+          </p>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
+            {WHITELABEL_OPTIONS.map((wl) => (
+              <div key={wl.id} style={{ background: "#000000", border: "1px solid #27272a", borderRadius: 10, padding: 20, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: "#ffffff" }}>{wl.name}</span>
+                    <span style={{ fontSize: 18, fontWeight: 900, color: "#ffffff" }}>${wl.price} <span style={{ fontSize: 11, color: "#71717a", fontWeight: 400 }}>/{wl.period}</span></span>
+                  </div>
+                  <p style={{ fontSize: 12, color: "#a1a1aa", marginBottom: 16 }}>{wl.desc}</p>
+                </div>
+                <button onClick={() => setSelectedPlan(wl.id)} className="vpx-button-secondary" style={{ width: "100%", padding: "8px" }}>
+                  Configure License
                 </button>
               </div>
             ))}
           </div>
         </div>
 
-        {/* How WL works */}
-        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: "32px", marginBottom: 40 }}>
-          <p style={{ fontWeight: 800, fontSize: 16, marginBottom: 24 }}>How white-label works</p>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 24 }}>
-            {[
-              { n: "01", t: "Pick a plan", d: "Choose Basic, Pro, or Source License" },
-              { n: "02", t: "Enter your domain", d: "We lock it exclusively to your account" },
-              { n: "03", t: "Point DNS", d: "Add a CNAME record — takes 5 minutes" },
-              { n: "04", t: "You're live", d: "Your brand, our infrastructure" },
-            ].map((s) => (
-              <div key={s.n}>
-                <p style={{ fontSize: 28, fontWeight: 900, color: "var(--accent)", opacity: 0.3, marginBottom: 8 }}>{s.n}</p>
-                <p style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{s.t}</p>
-                <p style={{ fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>{s.d}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      </main>
 
-        {/* FAQ */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          {[
-            { q: "Can two companies share a white-label domain?", a: "No. Each domain is exclusively locked to one account. Attempting to claim a taken domain returns an error." },
-            { q: "Is the Source License really one-time?", a: "Yes. $299 once, self-host forever. No monthly fees, no revenue share, no strings." },
-            { q: "Can I cancel anytime?", a: "Yes. Monthly plans cancel immediately. Your API key continues working until the end of the billing period." },
-            { q: "Can I resell on white-label?", a: "Yes, on White-label Pro. Charge your own users whatever you want — we don't take a cut." },
-          ].map((f) => (
-            <div key={f.q} style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "18px 20px" }}>
-              <p style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{f.q}</p>
-              <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.6 }}>{f.a}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Key result */}
-        {result && (
-          <div style={{ marginTop: 32, background: "#22c55e11", border: "1px solid #22c55e44", borderRadius: 14, padding: "20px 24px" }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: "var(--green)", marginBottom: 10 }}>Your API key — save this now, it won't be shown again</p>
-            <div style={{ display: "flex", gap: 10 }}>
-              <code style={{ flex: 1, background: "var(--surface2)", padding: "10px 14px", borderRadius: 10, fontSize: 13, wordBreak: "break-all" }}>{result.key}</code>
-              <button onClick={() => navigator.clipboard.writeText(result.key)}
-                style={{ padding: "10px 16px", borderRadius: 10, border: "1px solid var(--border)", background: "none", color: "var(--text)", cursor: "pointer", fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Copy</button>
-            </div>
-            <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 10 }}>
-              Plan: <strong style={{ color: "var(--text)" }}>{result.plan}</strong> · Header: <code style={{ background: "var(--surface2)", padding: "2px 6px", borderRadius: 4 }}>x-api-key: {result.key}</code>
-            </p>
-          </div>
-        )}
-      </div>
-
-      <style>{`
-        @media print {
-          button { display: none !important; }
-          input { border: 1px solid #ccc !important; }
-          body { background: white !important; color: black !important; }
-        }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-      `}</style>
-    </main>
+      <Footer />
+    </div>
   );
 }

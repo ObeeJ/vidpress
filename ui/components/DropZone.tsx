@@ -1,4 +1,5 @@
 "use client";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 
@@ -28,7 +29,7 @@ export default function DropZone() {
         })
         .catch(() => {});
     }
-  }, []);
+  }, [setNetworkMbps]);
 
   return (
     <div
@@ -37,36 +38,67 @@ export default function DropZone() {
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => { e.preventDefault(); setDragging(false); handle(e.dataTransfer.files); }}
       style={{
-        border: `2px dashed ${dragging ? "var(--accent)" : "var(--border)"}`,
-        borderRadius: 16,
-        padding: dragging ? "60px 24px" : "48px 24px",
+        border: `1.5px dashed ${dragging ? "#ffffff" : "#27272a"}`,
+        borderRadius: 12,
+        padding: dragging ? "52px 24px" : "44px 24px",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: 12,
+        justifyContent: "center",
+        gap: 14,
         cursor: "pointer",
-        background: dragging ? "var(--accent)0d" : "var(--surface)",
+        background: dragging ? "#121215" : "#09090b",
         transition: "all 0.15s ease",
-        transform: dragging ? "scale(1.01)" : "scale(1)",
       }}
     >
-      <div style={{
-        width: 52, height: 52, borderRadius: 14,
-        background: dragging ? "var(--accent)33" : "var(--surface2)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: dragging ? 28 : 24,
-        transition: "all 0.15s ease",
-      }}>
-        {dragging ? "⬇️" : "📁"}
+      <div
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 10,
+          background: "#18181b",
+          border: "1px solid #27272a",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#ffffff",
+        }}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="17 8 12 3 7 8" />
+          <line x1="12" y1="3" x2="12" y2="15" />
+        </svg>
       </div>
-      <div style={{ textAlign: "center" }}>
-        <p style={{ fontWeight: 600, marginBottom: 4, color: dragging ? "var(--accent)" : "var(--text)" }}>
-          {dragging ? "Drop it!" : "Drop files here"}
+
+      <div style={{ textAlign: "center", display: "flex", flexDirection: "column", gap: 4 }}>
+        <p style={{ fontWeight: 700, fontSize: 15, color: dragging ? "#ffffff" : "#f4f4f5" }}>
+          {dragging ? "Release file to ingest" : "Drop video, audio, or image files here"}
         </p>
-        <p style={{ color: "var(--muted)", fontSize: 12 }}>
-          {dragging ? "Release to add your file" : "or click to browse · Video · Audio · Images · GIF"}
+        <p style={{ color: "#a1a1aa", fontSize: 13 }}>
+          {dragging ? "VPX instant Rust pipeline active" : "or click to browse local files"}
         </p>
       </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", marginTop: 4 }}>
+        {["MP4", "MOV", "MKV", "WebM", "MP3", "WAV", "FLAC", "JPG", "PNG", "WebP", "GIF"].map((fmt) => (
+          <span
+            key={fmt}
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: "#71717a",
+              background: "#121215",
+              border: "1px solid #18181b",
+              borderRadius: 4,
+              padding: "2px 6px",
+            }}
+          >
+            {fmt}
+          </span>
+        ))}
+      </div>
+
       <input
         ref={inputRef}
         type="file"
