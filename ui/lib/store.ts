@@ -56,6 +56,7 @@ interface Store {
   setOutputFormat: (localUrl: string, fmt: string) => void;
   setError: (localUrl: string, error: string) => void;
   setNetworkMbps: (mbps: number) => void;
+  addFileWithUrl: (file: File, localUrl: string) => void;
   removeFile: (localUrl: string) => void;
 }
 
@@ -106,6 +107,10 @@ export const useStore = create<Store>((set) => ({
       files: s.files.map((f) => (f.localUrl === localUrl ? { ...f, error } : f)),
     })),
   setNetworkMbps: (networkMbps) => set({ networkMbps }),
+  addFileWithUrl: (file, localUrl) =>
+    set((s) => ({
+      files: [...s.files, { file, localUrl }],
+    })),
   removeFile: (localUrl) =>
     set((s) => ({ files: s.files.filter((f) => f.localUrl !== localUrl) })),
 }));

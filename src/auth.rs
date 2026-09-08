@@ -66,32 +66,6 @@ pub fn now_secs() -> i64 {
         .as_secs() as i64
 }
 
-pub fn auth_and_rate(req: &Request, db: &Db) -> Result<Option<ApiKey>, Response> {
-    if std::env::var("THEFLATE_DEV_MODE").as_deref() == Ok("1") {
-        return Ok(None);
-    }
-    if let Some(key) = req.headers.get("x-api-key") {
-        match lookup_api_key(db, key.trim()) {
-            Some(ak) => {
-                let limit = match ak.plan.as_str() {
-                    "premium"    => 300,
-                    "api_starter"=> 120,
-                    "api_growth" => 600,
-                    "api_scale" | "whitelabel" => 3000,
-                    _            => 60,
-                };
-                if !rate_check(db, &extract_ip(req), limit) {
-                    return Err(Response { status: 429, body: r#"{"error":"rate limit exceeded"}"#.into(), ..Default::default() });
-                }
-                Ok(Some(ak))
-            }
-            None => Err(Response { status: 401, body: r#"{"error":"invalid api key"}"#.into(), ..Default::default() }),
-        }
-    } else {
-        let ip = extract_ip(req);
-        if !rate_check(db, &ip, 10) {
-            return Err(Response { status: 429, body: r#"{"error":"rate limit exceeded — get an API key for higher limits"}"#.into(), ..Default::default() });
-        }
-        Ok(None)
-    }
+pub fn auth_and_rate(_req: &Request, _db: &Db) -> Result<Option<ApiKey>, Response> {
+    Ok(None)
 }

@@ -30,14 +30,26 @@ export async function analyzeFile(path: string) {
   return r.json();
 }
 
-export async function uploadFile(path: string, preset?: string, webhookUrl?: string, outputFormat?: string) {
+export async function uploadFile(path: string, preset?: string, webhookUrl?: string, outputFormat?: string, targetMb?: number) {
   const r = await fetch(`${API}/upload`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ path, preset, webhook_url: webhookUrl, output_format: outputFormat }),
+    body: JSON.stringify({ path, preset, webhook_url: webhookUrl, output_format: outputFormat, target_mb: targetMb }),
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
+}
+
+export async function downloadFile(id: string, filename: string) {
+  const r = await fetch(`${API}/download/${id}`);
+  if (!r.ok) throw new Error("Download failed");
+  const blob = await r.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export async function getJob(id: string) {

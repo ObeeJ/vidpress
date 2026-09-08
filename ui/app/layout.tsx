@@ -4,7 +4,7 @@ import { Toaster } from "@/lib/toast";
 
 export const metadata: Metadata = {
   title: "theflate | Deflate Media. Maximum Velocity.",
-  description: "Compress, convert, download, and transcribe any media instantly with sub-second Rust execution.",
+  description: "Theflate any media instantly — compress, convert, download, and transcribe.",
   icons: {
     icon: "/icon.svg",
   },

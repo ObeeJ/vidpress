@@ -25,6 +25,7 @@ pub async fn upload(req: Request) -> Response {
     let webhook_url   = body["webhook_url"].as_str().map(String::from);
     let preset        = body["preset"].as_str().map(String::from);
     let output_format = body["output_format"].as_str().map(String::from);
+    let target_mb     = body["target_mb"].as_f64();
     let destination: Option<DestinationConfig> = serde_json::from_value(body["destination"].clone()).ok();
 
     let mut profile = match detect_with_hw(&path, &state.hw).await {
@@ -55,7 +56,7 @@ pub async fn upload(req: Request) -> Response {
 
     let (jobs, db, id2, hw, sem) = (state.jobs.clone(), state.db.clone(), id.clone(), state.hw.clone(), state.job_sem.clone());
     tokio::spawn(async move {
-        crate::jobs::compress::run(id2, path, output_path, profile, preset, jobs, db, hw, sem).await;
+        crate::jobs::compress::run(id2, path, output_path, profile, preset, target_mb, jobs, db, hw, sem).await;
     });
 
     Response {

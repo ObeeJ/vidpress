@@ -28,7 +28,7 @@ export default function Home() {
           </h1>
 
           <p style={{ fontSize: 16, color: "#a1a1aa", maxWidth: 580, lineHeight: 1.6 }}>
-            Compress video, audio, and images by up to 90% with zero visible quality loss. High-speed media processing for developers and creators.
+            Theflate video, audio, and images by up to 90% with zero visible quality loss. High-speed media processing for developers and creators.
           </p>
         </div>
 
@@ -38,10 +38,10 @@ export default function Home() {
         {/* Action Input Mode Selector */}
         <div style={{ display: "flex", background: "#09090b", border: "1px solid #27272a", borderRadius: 10, padding: 4, gap: 2 }}>
           {([
-            { id: "upload", label: "Upload & Deflate" },
+            { id: "upload", label: "Upload & Theflate" },
             { id: "url",    label: "Social Link" },
             { id: "screen", label: "Screen Record" },
-            { id: "live",   label: "Live Stream" },
+            { id: "live",   label: "Live" },
           ] as const).map(({ id, label }) => (
             <button
               key={id}

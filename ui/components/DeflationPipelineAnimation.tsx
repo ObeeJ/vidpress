@@ -7,9 +7,9 @@ export default function DeflationPipelineAnimation() {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
   const steps = [
-    { id: "raw", label: "Raw Heavy Media", size: "1.24 GB", detail: "4K ProRes / Raw Footage" },
-    { id: "engine", label: "theflate Deflation Laser", size: "Processing...", detail: "H.265 / WebP Stream Engine" },
-    { id: "deflated", label: "Deflated Micro Payload", size: "142 MB (-88%)", detail: "Zero Loss Visual Fidelity" },
+    { id: "raw", label: "Original file", size: "1.24 GB", detail: "Before theflating" },
+    { id: "engine", label: "theflate", size: "Theflating...", detail: "Optimising your file" },
+    { id: "deflated", label: "Theflated file", size: "142 MB (-88%)", detail: "Ready to download" },
   ];
 
   return (
@@ -72,9 +72,9 @@ export default function DeflationPipelineAnimation() {
                 stroke={hoveredNode === "raw" || activeStep === 0 ? "#ffffff" : "#27272a"}
                 strokeWidth="2"
               />
-              <text x="0" y="-35" textAnchor="middle" fill="#71717a" fontSize="22" fontWeight="700">RAW MEDIA</text>
+              <text x="0" y="-35" textAnchor="middle" fill="#71717a" fontSize="22" fontWeight="700">ORIGINAL</text>
               <text x="0" y="5" textAnchor="middle" fill="#ffffff" fontSize="36" fontWeight="900">1.24 GB</text>
-              <text x="0" y="38" textAnchor="middle" fill="#a1a1aa" fontSize="18">Uncompressed File</text>
+              <text x="0" y="38" textAnchor="middle" fill="#a1a1aa" fontSize="18">Original File</text>
             </g>
 
             {/* Connecting Flow Stream 1 */}
@@ -108,8 +108,8 @@ export default function DeflationPipelineAnimation() {
                 <animate attributeName="r" values="24;30;24" dur="2s" repeatCount="indefinite" />
               </circle>
               <polygon points="-8,-25 8,-25 0,-12" fill="#ffffff" />
-              <text x="0" y="32" textAnchor="middle" fill="#ffffff" fontSize="24" fontWeight="900">DEFLATION CORE</text>
-              <text x="0" y="55" textAnchor="middle" fill="#10b981" fontSize="18" fontWeight="700">H.265 Stream Active</text>
+              <text x="0" y="32" textAnchor="middle" fill="#ffffff" fontSize="24" fontWeight="900">theflate</text>
+              <text x="0" y="55" textAnchor="middle" fill="#10b981" fontSize="18" fontWeight="700">Theflating</text>
             </g>
 
             {/* Connecting Flow Stream 2 */}
@@ -137,7 +137,7 @@ export default function DeflationPipelineAnimation() {
                 stroke={hoveredNode === "deflated" || activeStep === 2 ? "#10b981" : "#27272a"}
                 strokeWidth="2"
               />
-              <text x="0" y="-30" textAnchor="middle" fill="#10b981" fontSize="20" fontWeight="800">DEFLATED PAYLOAD</text>
+              <text x="0" y="-30" textAnchor="middle" fill="#10b981" fontSize="20" fontWeight="800">COMPRESSED</text>
               <text x="0" y="10" textAnchor="middle" fill="#ffffff" fontSize="34" fontWeight="900">142 MB</text>
               <text x="0" y="38" textAnchor="middle" fill="#10b981" fontSize="18" fontWeight="700">−88% Reduction</text>
             </g>
@@ -163,7 +163,7 @@ export default function DeflationPipelineAnimation() {
           </div>
 
           <div style={{ fontSize: 12, color: "#71717a" }}>
-            Click nodes to inspect vector pipeline stages
+            Click to explore
           </div>
         </div>
       </div>

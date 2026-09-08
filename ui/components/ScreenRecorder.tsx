@@ -8,7 +8,7 @@ import { toast } from "@/lib/toast";
 type RecordState = "idle" | "recording" | "processing";
 
 export default function ScreenRecorder() {
-  const { addFiles, setServerPath, setProfile, setError } = useStore();
+  const { addFileWithUrl, setServerPath, setProfile, setError } = useStore();
   const [state, setState] = useState<RecordState>("idle");
   const [elapsed, setElapsed] = useState(0);
   const mediaRef = useRef<MediaRecorder | null>(null);
@@ -70,17 +70,14 @@ export default function ScreenRecorder() {
     stream.getTracks().forEach((t) => t.stop());
     const blob = new Blob(chunksRef.current, { type: "video/webm" });
     const file = new File([blob], `screen_${Date.now()}.webm`, { type: "video/webm" });
-
-    // Add to the store so a FileCard appears
-    addFiles([file]);
     const localUrl = URL.createObjectURL(file);
-
+    addFileWithUrl(file, localUrl);
     try {
       const path = await ingestFile(file);
       setServerPath(localUrl, path);
       const profile = await analyzeFile(path);
       setProfile(localUrl, profile);
-      toast("Screen recording ready to compress", "success");
+      toast("Screen recording ready to theflate", "success");
     } catch (e) {
       setError(localUrl, String(e));
       toast(String(e), "error");
@@ -118,7 +115,7 @@ export default function ScreenRecorder() {
         )}
         {state === "recording" && (
           <button onClick={stopRecording} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #ef4444", background: "#ef444422", color: "#ef4444", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-            Stop & Compress
+            Stop & Theflate
           </button>
         )}
         {state === "processing" && (

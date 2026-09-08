@@ -12,7 +12,7 @@ use crate::{
 
 pub async fn run(
     id: String, input: String, output: String,
-    profile: MediaProfile, preset: Option<String>,
+    profile: MediaProfile, preset: Option<String>, target_mb: Option<f64>,
     jobs: JobStore, db: Db, hw: HwEncoder,
     sem: std::sync::Arc<tokio::sync::Semaphore>,
 ) {
@@ -35,7 +35,29 @@ pub async fn run(
 
     let progress_file = format!("/tmp/{id}_progress");
     let duration = profile.duration_secs;
-    let ffmpeg_args = preset_ffmpeg_args(&preset, &hw).unwrap_or(profile.ffmpeg_args.clone());
+    let ffmpeg_args = if let Some(mb) = target_mb.filter(|_| preset.is_none()) {
+        // Convert target MB to a video bitrate, reserving 128k for audio
+        let total_kbps = ((mb * 8.0 * 1024.0) / profile.duration_secs.max(1.0)) as u64;
+        let video_kbps = total_kbps.saturating_sub(128).max(100);
+        match &hw {
+            HwEncoder::Vaapi => vec![
+                "-vaapi_device".into(), "/dev/dri/renderD128".into(),
+                "-vf".into(), "format=nv12,hwupload".into(),
+                "-c:v".into(), "h264_vaapi".into(),
+                "-b:v".into(), format!("{video_kbps}k"),
+                "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
+                "-movflags".into(), "+faststart".into(),
+            ],
+            HwEncoder::Software => vec![
+                "-c:v".into(), "libx264".into(), "-preset".into(), "fast".into(),
+                "-b:v".into(), format!("{video_kbps}k"),
+                "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
+                "-movflags".into(), "+faststart".into(),
+            ],
+        }
+    } else {
+        preset_ffmpeg_args(&preset, &hw).unwrap_or(profile.ffmpeg_args.clone())
+    };
 
     let mut args: Vec<String> = vec!["-y".into(), "-i".into(), input];
     args.extend(ffmpeg_args);

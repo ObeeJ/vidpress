@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useStore } from "@/lib/store";
+import { downloadFile } from "@/lib/api";
 import { toast } from "@/lib/toast";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8081";
@@ -9,7 +9,6 @@ const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8081";
 type StreamState = "idle" | "connecting" | "live" | "done";
 
 export default function LiveStream() {
-  const { setJob, setJobId } = useStore();
   const [streamState, setStreamState] = useState<StreamState>("idle");
   const [jobId, setJobIdLocal] = useState<string | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -20,26 +19,20 @@ export default function LiveStream() {
   async function startStream() {
     setStreamState("connecting");
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 30 },
-        audio: true,
-      });
-
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 30 }, audio: true });
       const ws = new WebSocket(WS_URL);
       wsRef.current = ws;
 
       ws.onopen = () => {
         const mr = new MediaRecorder(stream, {
-          mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-            ? "video/webm;codecs=vp9,opus"
-            : "video/webm",
+          mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus") ? "video/webm;codecs=vp9,opus" : "video/webm",
         });
         mr.ondataavailable = (e) => {
           if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
             e.data.arrayBuffer().then((buf) => ws.send(buf));
           }
         };
-        mr.start(500); // 500ms chunks for low latency
+        mr.start(500);
         mrRef.current = mr;
         setStreamState("live");
         setElapsed(0);
@@ -52,7 +45,7 @@ export default function LiveStream() {
           const msg = JSON.parse(e.data);
           if (msg.job_id) {
             setJobIdLocal(msg.job_id);
-            toast(`Live stream job: ${msg.job_id.slice(0, 8)}…`, "info");
+            toast("Stream captured — ready to download when ended", "info");
           }
         } catch {}
       };
@@ -86,10 +79,6 @@ export default function LiveStream() {
     return `${m}:${sec}`;
   }
 
-  const previewUrl = jobId
-    ? `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080"}/preview/${jobId}`
-    : null;
-
   return (
     <div style={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 12, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -107,9 +96,7 @@ export default function LiveStream() {
 
       <div style={{ display: "flex", gap: 10 }}>
         {streamState === "idle" && (
-          <button onClick={startStream} className="vpx-button-primary" style={{ flex: 1 }}>
-            Go Live
-          </button>
+          <button onClick={startStream} className="vpx-button-primary" style={{ flex: 1 }}>Go Live</button>
         )}
         {streamState === "connecting" && (
           <div style={{ flex: 1, padding: "10px", textAlign: "center", fontSize: 13, color: "#a1a1aa" }}>Connecting...</div>
@@ -120,25 +107,14 @@ export default function LiveStream() {
           </button>
         )}
         {streamState === "done" && jobId && (
-          <div style={{ flex: 1, fontSize: 12, color: "#10b981" }}>
-            Recording saved — ready to download
-          </div>
+          <button onClick={() => downloadFile(jobId, "stream.webm")} className="vpx-button-primary" style={{ flex: 1 }}>
+            Download Recording
+          </button>
+        )}
+        {streamState === "done" && !jobId && (
+          <div style={{ flex: 1, fontSize: 12, color: "#71717a", padding: "10px" }}>No recording captured.</div>
         )}
       </div>
-
-      {/* Live preview of the stream output as it's being written */}
-      {previewUrl && streamState === "live" && (
-        <div style={{ borderRadius: 8, overflow: "hidden", background: "#000", border: "1px solid #27272a" }}>
-          <video
-            key={previewUrl}
-            src={previewUrl}
-            autoPlay
-            muted
-            playsInline
-            style={{ width: "100%", maxHeight: 240, display: "block" }}
-          />
-        </div>
-      )}
 
       <div style={{ fontSize: 11, color: "#52525b" }}>
         Your recording will be available to download when you end the session.

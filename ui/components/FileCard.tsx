@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useStore, FileItem } from "@/lib/store";
-import { ingestFile, analyzeFile, uploadFile, getJob, transcribeFile, exportToDestination, API } from "@/lib/api";
+import { ingestFile, analyzeFile, uploadFile, downloadFile, getJob, transcribeFile, exportToDestination, API } from "@/lib/api";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "@/lib/toast";
 
@@ -111,8 +111,8 @@ export default function FileCard({ item }: { item: FileItem }) {
         setJob(item.localUrl, job);
         if (job.status === "done" || job.status === "failed") {
           if (pollRef.current) clearInterval(pollRef.current);
-          if (job.status === "done") toast(`${item.file.name} successfully compressed`, "success");
-          if (job.status === "failed") toast(`Compression failed for ${item.file.name}`, "error");
+          if (job.status === "done") toast(`${item.file.name} theflated successfully`, "success");
+          if (job.status === "failed") toast(`Failed to theflate ${item.file.name}`, "error");
         }
       } catch {
         // transient error — keep polling
@@ -134,17 +134,18 @@ export default function FileCard({ item }: { item: FileItem }) {
   const outputUrl = job?.status === "done" ? `${API}/download/${job.id}` : null;
   const shareUrl = job?.status === "done" ? `${BASE_URL}/download/${job.id}` : null;
 
-  async function compress() {
+  async function theflate() {
     if (!item.serverPath) return;
     try {
       const { job_id } = await uploadFile(
         item.serverPath,
         selectedPreset === "original" ? undefined : selectedPreset,
         undefined,
-        selectedFormat !== profile?.output_ext ? selectedFormat : undefined
+        selectedFormat !== profile?.output_ext ? selectedFormat : undefined,
+        selectedPreset === "original" ? targetMb : undefined,
       );
       setJobId(item.localUrl, job_id);
-      toast("Compression job queued", "info");
+      toast("Theflating...", "info");
     } catch (e) {
       setError(item.localUrl, String(e));
       toast(String(e), "error");
@@ -230,7 +231,7 @@ export default function FileCard({ item }: { item: FileItem }) {
         {!profile && !item.error && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a1a1aa" }}>
-              <span>{item.serverPath ? "Analyzing file..." : "Uploading..."}</span>
+              <span>{item.serverPath ? "Inspecting file..." : "Uploading..."}</span>
               {!item.serverPath && <span>{item.uploadPct ?? 0}%</span>}
             </div>
             <div style={{ height: 4, background: "#18181b", borderRadius: 99, overflow: "hidden" }}>
@@ -328,15 +329,15 @@ export default function FileCard({ item }: { item: FileItem }) {
         {profile && !job && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "10px 14px" }}>
             {stat("Est. Cost", costEstimate, "#10b981")}
-            {stat("Compress Time", fmtTime(profile.estimated_time_secs))}
+            {stat("Theflate Time", fmtTime(profile.estimated_time_secs))}
             {stat("Download Time", fmtTime(downloadTimeSecs))}
           </div>
         )}
 
-        {/* Compress Button */}
+        {/* Theflate Button */}
         {profile && !job && (
-          <button onClick={compress} className="vpx-button-primary" style={{ width: "100%", padding: "10px" }}>
-            Compress →
+          <button onClick={theflate} className="vpx-button-primary" style={{ width: "100%", padding: "10px" }}>
+            Theflate →
           </button>
         )}
 
@@ -344,8 +345,12 @@ export default function FileCard({ item }: { item: FileItem }) {
         {job && job.status !== "done" && job.status !== "failed" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a1a1aa" }}>
-              <span>Compressing...</span>
-              <span>{job.progress}% · ETA {fmtTime(job.eta_secs)}</span>
+              <span>{job.status === "queued" ? "In queue..." : "Theflating..."}</span>
+              <span>
+                {job.status === "queued"
+                  ? `ETA ${fmtTime(profile?.estimated_time_secs ?? 0)}`
+                  : `${job.progress}% · ETA ${fmtTime(job.eta_secs > 0 ? job.eta_secs : profile?.estimated_time_secs ?? 0)}`}
+              </span>
             </div>
             <div style={{ height: 6, background: "#18181b", borderRadius: 99, overflow: "hidden" }}>
               <div style={{ height: "100%", width: `${job.progress}%`, background: "#ffffff", borderRadius: 99, transition: "width 0.4s ease" }} />
@@ -447,9 +452,13 @@ export default function FileCard({ item }: { item: FileItem }) {
                 {showQrModal ? "Hide QR Code" : "QR Share"}
               </button>
               {outputUrl && (
-                <a href={outputUrl} download style={{ flex: 1, textDecoration: "none" }}>
-                  <button className="vpx-button-primary" style={{ width: "100%" }}>Download Compressed File</button>
-                </a>
+                <button
+                  onClick={() => downloadFile(job!.id, `theflated_${item.file.name}`)}
+                  className="vpx-button-primary"
+                  style={{ flex: 1 }}
+                >
+                  Download
+                </button>
               )}
             </div>
 
