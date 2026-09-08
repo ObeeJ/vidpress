@@ -33,7 +33,7 @@ pub fn lookup_api_key(db: &Db, key: &str) -> Option<ApiKey> {
 }
 
 pub fn extract_ip(req: &Request) -> String {
-    let trust_proxy = std::env::var("VIDPRESS_TRUST_PROXY").as_deref() == Ok("1");
+    let trust_proxy = std::env::var("THEFLATE_TRUST_PROXY").as_deref() == Ok("1");
     if trust_proxy {
         if let Some(fwd) = req.headers.get("x-forwarded-for") {
             let ip = fwd.split(',').next().unwrap_or(fwd).trim().to_string();

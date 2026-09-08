@@ -99,7 +99,7 @@ curl http://localhost:8080/download/JOB_ID -o compressed.mp4
 
 ### Webhook payload
 
-When a job completes, vidpress POSTs to your `webhook_url`:
+When a job completes, theflate POSTs to your `webhook_url`:
 
 ```json
 {
@@ -138,7 +138,7 @@ Each white-label domain is **exclusively locked** to one account. No two compani
 
 1. Buy a white-label plan at `/pricing`
 2. Enter your domain (e.g. `compress.yourbrand.com`) and brand name
-3. Add a CNAME DNS record pointing to the vidpress server
+3. Add a CNAME DNS record pointing to the theflate server
 4. Your users see your brand — we handle the infrastructure
 
 ## Nginx setup
@@ -157,7 +157,7 @@ sudo certbot --nginx -d yourdomain.com
 Already installed. Runs hourly, deletes output files older than 24h, marks stale jobs failed.
 
 ```bash
-crontab -l | grep vidpress
+crontab -l | grep theflate
 # 0 * * * * /path/to/theflate/cleanup.sh
 ```
 
