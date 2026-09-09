@@ -1,6 +1,6 @@
 use glideapi::{FromRequest, Request, Response, State};
 use glideapi_macros::get;
-use crate::{auth::auth_and_rate, db::get_job, jobs::model::JobStatus, state::AppState};
+use crate::{auth::auth_and_rate, db::get_job_for, jobs::model::JobStatus, state::AppState};
 
 /// Parse an RFC 7233 single byte-range against a known total size.
 ///
@@ -31,10 +31,10 @@ const MAX_CHUNK: u64 = 8 * 1024 * 1024;
 #[get("/jobs/:id")]
 pub async fn poll_job(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
-    if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
+    let caller = match auth_and_rate(&req, &state.db) { Ok(c) => c, Err(r) => return r };
     let id = req.params.get("id").cloned().unwrap_or_default();
-    let job = state.jobs.lock().unwrap_or_else(|e| e.into_inner()).get(&id).cloned()
-        .or_else(|| get_job(&state.db, &id));
+    let caller_key = caller.as_ref().map(|k| k.key.as_str());
+    let job = get_job_for(&state.db, &id, caller_key);
     match job {
         Some(j) => Response { status: 200, body: serde_json::to_string(&j.public()).unwrap().into(), ..Default::default() },
         None    => Response { status: 404, body: r#"{"error":"job not found"}"#.into(), ..Default::default() },
@@ -44,10 +44,10 @@ pub async fn poll_job(req: Request) -> Response {
 #[get("/download/:id")]
 pub async fn download(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
-    if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
+    let caller = match auth_and_rate(&req, &state.db) { Ok(c) => c, Err(r) => return r };
     let id = req.params.get("id").cloned().unwrap_or_default();
-    let job = state.jobs.lock().unwrap_or_else(|e| e.into_inner()).get(&id).cloned()
-        .or_else(|| get_job(&state.db, &id));
+    let caller_key = caller.as_ref().map(|k| k.key.as_str());
+    let job = get_job_for(&state.db, &id, caller_key);
     match job {
         Some(j) if matches!(j.status, JobStatus::Done) => {
             let meta = match std::fs::metadata(&j.output_path) {

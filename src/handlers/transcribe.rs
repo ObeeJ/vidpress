@@ -3,7 +3,7 @@ use glideapi_macros::{get, post};
 use rusqlite::params;
 use tokio::process::Command;
 use uuid::Uuid;
-use crate::{auth::auth_and_rate, db::get_job, jobs::model::JobStatus, state::{AppState, storage_dir}};
+use crate::{auth::auth_and_rate, db::get_job_for, jobs::model::JobStatus, state::{AppState, storage_dir}};
 
 #[post("/transcribe")]
 pub async fn transcribe(req: Request) -> Response {
@@ -17,8 +17,7 @@ pub async fn transcribe(req: Request) -> Response {
     };
 
     let path = if let Some(jid) = body["job_id"].as_str() {
-        let job = state.jobs.lock().unwrap_or_else(|e| e.into_inner()).get(jid).cloned()
-            .or_else(|| get_job(&state.db, jid));
+        let job = get_job_for(&state.db, jid, caller.as_ref().map(|k| k.key.as_str()));
         match job {
             Some(j) if matches!(j.status, JobStatus::Done) => j.output_path,
             Some(_) => return Response { status: 409, body: r#"{"error":"job not done yet"}"#.into(), ..Default::default() },

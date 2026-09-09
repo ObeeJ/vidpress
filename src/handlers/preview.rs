@@ -1,19 +1,17 @@
 use glideapi::{FromRequest, Request, Response, State};
 use glideapi_macros::get;
-use crate::{auth::auth_and_rate, db::get_job, state::AppState};
+use crate::{auth::auth_and_rate, db::get_job_for, state::AppState};
 
 const MAX_PREVIEW: usize = 4 * 1024 * 1024;
 
 #[get("/preview/:id")]
 pub async fn preview(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
-    if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
+    let caller = match auth_and_rate(&req, &state.db) { Ok(c) => c, Err(r) => return r };
 
     let id = req.params.get("id").cloned().unwrap_or_default();
-    let job = state.jobs.lock().unwrap_or_else(|e| e.into_inner()).get(&id).cloned()
-        .or_else(|| get_job(&state.db, &id));
-
-    let job = match job {
+    let caller_key = caller.as_ref().map(|k| k.key.as_str());
+    let job = match get_job_for(&state.db, &id, caller_key) {
         Some(j) => j,
         None => return Response { status: 404, body: r#"{"error":"job not found"}"#.into(), ..Default::default() },
     };
