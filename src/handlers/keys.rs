@@ -1,27 +1,35 @@
 use glideapi::{FromRequest, Request, Response, State};
 use glideapi_macros::post;
 use rusqlite::params;
-use crate::{auth::{auth_and_rate, generate_api_key}, state::AppState};
+use crate::{auth::{auth_and_rate, generate_api_key, hash_key}, handlers::analyze::json_err, state::AppState};
 
 #[post("/keys")]
 pub async fn create_key(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
     if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
 
+    // Unauthenticated key minting let anyone permanently squat a white-label
+    // domain via the UNIQUE index on api_keys.white_label_domain. (H10)
+    let expected = std::env::var("THEFLATE_ADMIN_TOKEN").ok();
+    match (expected.as_deref(), req.headers.get("x-admin-token").map(|s| s.as_str())) {
+        (Some(want), Some(got)) if !want.is_empty() && got == want => {}
+        _ => return json_err(403, "forbidden"),
+    }
+
     let body: serde_json::Value = match serde_json::from_slice(&req.body) {
         Ok(v) => v,
-        Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into(), ..Default::default() },
+        Err(_) => return json_err(400, "invalid json"),
     };
     let name      = body["name"].as_str().unwrap_or("unnamed").to_string();
-    let plan      = "free"; // always free — plan upgrades go through Stripe webhook
+    let plan      = "free";
     let webhook   = body["webhook_url"].as_str().map(String::from);
     let wl_domain = body["white_label_domain"].as_str().map(String::from);
     let wl_brand  = body["white_label_brand"].as_str().map(String::from);
     let key       = generate_api_key();
+    let key_hash  = hash_key(&key);
 
-    // Single lock scope — avoids the double-lock deadlock (B3)
     {
-        let conn = state.db.lock().unwrap();
+        let conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(ref domain) = wl_domain {
             let exists: bool = conn.query_row(
                 "SELECT COUNT(*) FROM api_keys WHERE white_label_domain=?1",
@@ -33,11 +41,12 @@ pub async fn create_key(req: Request) -> Response {
         }
         if let Err(e) = conn.execute(
             "INSERT INTO api_keys(key,name,plan,webhook_url,white_label_domain,white_label_brand) VALUES(?1,?2,?3,?4,?5,?6)",
-            params![key, name, plan, webhook, wl_domain, wl_brand],
+            params![key_hash, name, plan, webhook, wl_domain, wl_brand],
         ) {
             tracing::error!("create_key insert failed: {e}");
-            return Response { status: 500, body: r#"{"error":"internal error"}"#.into(), ..Default::default() };
+            return json_err(500, "internal error");
         }
     }
+    // Return the plaintext key exactly once — it is unrecoverable afterwards.
     Response { status: 201, body: serde_json::json!({ "key": key, "name": name, "plan": plan }).to_string().into(), ..Default::default() }
 }

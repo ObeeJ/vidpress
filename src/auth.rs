@@ -18,11 +18,22 @@ pub fn generate_api_key() -> String {
     format!("vp_{}", hex::encode_upper(&bytes))
 }
 
+/// API keys are stored as SHA-256 hex, never verbatim. A database dump must
+/// not hand over live credentials. (H9)
+///
+/// Unsalted SHA-256 is correct here: these are 128-bit random tokens, not
+/// user-chosen secrets, so there is no dictionary to attack, and lookup must
+/// remain a single indexed query.
+pub fn hash_key(raw: &str) -> String {
+    use sha2::{Digest, Sha256};
+    hex::encode(Sha256::digest(raw.as_bytes()))
+}
+
 pub fn lookup_api_key(db: &Db, key: &str) -> Option<ApiKey> {
-    let conn = db.lock().unwrap();
+    let conn = db.lock().unwrap_or_else(|e| e.into_inner());
     conn.query_row(
         "SELECT key,name,plan,webhook_url FROM api_keys WHERE key=?1",
-        params![key],
+        params![hash_key(key)],
         |r| Ok(ApiKey {
             key:         r.get(0)?,
             name:        r.get(1)?,
