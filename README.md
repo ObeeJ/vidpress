@@ -41,6 +41,7 @@ bun run dev
 |---|---|---|
 | `THEFLATE_STORAGE` | `/tmp/theflate_output` | Where compressed files are stored |
 | `THEFLATE_DB` | `/tmp/theflate.db` | SQLite database path |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Backend API base URL |
 | `NEXT_PUBLIC_BASE_URL` | `http://localhost:3000` | Public URL for QR codes and sharing |
 
 ## API
