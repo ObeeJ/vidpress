@@ -1,7 +1,7 @@
 use glideapi::{FromRequest, Request, Response, State};
 use glideapi_macros::post;
 use uuid::Uuid;
-use crate::{auth::auth_and_rate, state::{AppState, ALLOWED_EXTS}};
+use crate::{auth::auth_and_rate, media::path_guard::ingest_dir, state::{AppState, ALLOWED_EXTS}};
 
 #[post("/ingest")]
 pub async fn ingest(req: Request) -> Response {
@@ -16,7 +16,12 @@ pub async fn ingest(req: Request) -> Response {
         return Response { status: 415, body: r#"{"error":"unsupported file type"}"#.into(), ..Default::default() };
     }
 
-    let path = format!("/tmp/theflate_{}.{}", Uuid::new_v4(), ext);
+    let dir = ingest_dir();
+    if let Err(e) = tokio::fs::create_dir_all(&dir).await {
+        tracing::error!("cannot create ingest dir {dir}: {e}");
+        return Response { status: 500, body: r#"{"error":"storage unavailable"}"#.into(), ..Default::default() };
+    }
+    let path = format!("{dir}/theflate_{}.{}", Uuid::new_v4(), ext);
     if let Err(e) = tokio::fs::write(&path, &req.body).await {
         return Response { status: 500, body: format!(r#"{{"error":"{e}"}}"#).into(), ..Default::default() };
     }
