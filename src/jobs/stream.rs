@@ -58,14 +58,15 @@ pub async fn finish_session(
     jobs: &JobStore,
     db: &Db,
 ) {
-    drop(session.stdin);  // close stdin → ffmpeg EOF → finalises file
-    let _ = session.child.wait().await;
-
+    drop(session.stdin);  // close stdin -> ffmpeg EOF -> finalises file
+    let exit_status = session.child.wait().await;
     let size = std::fs::metadata(&session.output).map(|m| m.len()).unwrap_or(0);
+    let ok = matches!(exit_status, Ok(s) if s.success()) && size > 0;
+    let job_status = if ok { JobStatus::Done } else { JobStatus::Failed };
 
     let job = Job {
         id: id.clone(),
-        status: JobStatus::Done,
+        status: job_status,
         media_kind: MediaKind::Video,
         input_path: "ws://stream".into(),
         output_path: session.output.clone(),
@@ -74,5 +75,5 @@ pub async fn finish_session(
         webhook_url: None, preset: None, destination: None, remote_url: None, owner_key: None,
     };
     upsert_job(db, &job);
-    jobs.lock().unwrap().insert(id, job);
+    jobs.lock().unwrap_or_else(|e| e.into_inner()).insert(id, job);
 }
