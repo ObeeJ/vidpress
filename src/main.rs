@@ -38,6 +38,7 @@ async fn main() {
     let ws_state = Arc::new(state.clone());
     tokio::spawn(async move { ws::listen(ws_state).await });
 
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".into());
     App::new()
         .config(Config {
             body_limit:      2 * 1024 * 1024 * 1024,
@@ -46,6 +47,6 @@ async fn main() {
         })
         .state(state)
         .mount_routes()
-        .listen("0.0.0.0:8080")
+        .listen(&format!("0.0.0.0:{port}"))
         .await;
 }
