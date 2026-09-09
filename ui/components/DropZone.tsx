@@ -91,6 +91,8 @@ export default function DropZone() {
         type="file"
         multiple
         accept="video/*,audio/*,image/*,.gif,.webp"
+        aria-label="Upload video, audio, or image files"
+        aria-describedby={descId}
         style={{ position: "absolute", width: 1, height: 1, opacity: 0, pointerEvents: "none" }}
         onChange={(e) => { handle(e.target.files); initNetwork(); }}
       />

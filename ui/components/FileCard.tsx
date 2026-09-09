@@ -336,15 +336,15 @@ export default function FileCard({ item }: { item: FileItem }) {
         {profile && !job && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "10px 14px" }}>
             {stat("Est. Cost", costEstimate, "#10b981")}
-            {stat("Theflate Time", fmtTime(profile.estimated_time_secs))}
+            {stat("Compression Time", fmtTime(profile.estimated_time_secs))}
             {stat("Download Time", fmtTime(downloadTimeSecs))}
           </div>
         )}
 
-        {/* Theflate Button */}
+        {/* Compress Button */}
         {profile && !job && (
           <Button variant="primary" onClick={theflate} style={{ width: "100%", padding: "10px" }}>
-            Theflate →
+            Compress →
           </Button>
         )}
 
@@ -352,7 +352,7 @@ export default function FileCard({ item }: { item: FileItem }) {
         {job && job.status !== "done" && job.status !== "failed" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a1a1aa" }}>
-              <span>{job.status === "queued" ? "In queue..." : "Theflating..."}</span>
+              <span>{job.status === "queued" ? "In queue..." : "Compressing..."}</span>
               <span>
                 {job.status === "queued"
                   ? `ETA ${fmtTime(profile?.estimated_time_secs ?? 0)}`
@@ -383,7 +383,7 @@ export default function FileCard({ item }: { item: FileItem }) {
                 <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-signal, #C9F24E)" }}>
                   <CountUp from={job.original_bytes} to={job.compressed_bytes} format={fmt} durationMs={560} />
                 </span>
-                <span style={{ fontSize: 11, color: "#71717a" }}>Theflated</span>
+                <span style={{ fontSize: 11, color: "#71717a" }}>Compressed</span>
               </div>
               {stat("Saved", `${(((job.original_bytes - job.compressed_bytes) / job.original_bytes) * 100).toFixed(1)}%`, "var(--color-signal, #C9F24E)")}
             </div>
