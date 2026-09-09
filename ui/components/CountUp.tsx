@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface CountUpProps {
   from: number;
@@ -10,30 +10,24 @@ interface CountUpProps {
 }
 
 export default function CountUp({ from, to, format, durationMs = 560 }: CountUpProps) {
-  const ref = useRef<HTMLSpanElement>(null);
+  const [value, setValue] = useState(from);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced || from === to) {
-      if (ref.current) ref.current.textContent = format(to);
-      return;
-    }
+    if (reduced) { setValue(to); return; }
 
     const start = performance.now();
-    let raf: number;
-
-    function tick(now: number) {
+    const animate = (now: number) => {
       const t = Math.min((now - start) / durationMs, 1);
       // expo-out: 1 - (1-t)^3
       const eased = 1 - Math.pow(1 - t, 3);
-      const value = Math.round(from + (to - from) * eased);
-      if (ref.current) ref.current.textContent = format(value);
-      if (t < 1) raf = requestAnimationFrame(tick);
-    }
+      setValue(Math.round(from + (to - from) * eased));
+      if (t < 1) rafRef.current = requestAnimationFrame(animate);
+    };
+    rafRef.current = requestAnimationFrame(animate);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [from, to, durationMs]);
 
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [from, to, format, durationMs]);
-
-  return <span ref={ref}>{format(to)}</span>;
+  return <span className="tabular">{format(value)}</span>;
 }

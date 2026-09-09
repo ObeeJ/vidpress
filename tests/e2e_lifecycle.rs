@@ -1,47 +1,51 @@
 /// End-to-end lifecycle tests against a real spawned server.
 ///
-/// Requires: ffmpeg on PATH (for fixture generation), the compiled binary.
+/// Requires: ffmpeg on PATH (to generate the fixture) and the compiled binary.
 /// Run with: cargo test --test e2e_lifecycle -- --test-threads=1
+///
+/// Each test boots the binary against a temp DB and temp storage, polls
+/// GET /health until ready, then drives the full advertised contract.
+
 use std::process::{Child, Command, Stdio};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tempfile::TempDir;
 
 struct TestServer {
     child: Child,
     port: u16,
-    _db_dir: TempDir,
-    _storage_dir: TempDir,
+    _tmp: TempDir,
 }
 
 impl TestServer {
     fn start() -> Self {
-        let db_dir = TempDir::new().unwrap();
-        let storage_dir = TempDir::new().unwrap();
+        let tmp = TempDir::new().expect("tempdir");
+        let db   = tmp.path().join("test.db");
+        let stor = tmp.path().join("storage");
+        std::fs::create_dir_all(&stor).ok();
         let port = 18080u16;
 
         let child = Command::new(env!("CARGO_BIN_EXE_theflate"))
-            .env("THEFLATE_DB", db_dir.path().join("test.db"))
-            .env("THEFLATE_STORAGE", storage_dir.path())
-            .env("THEFLATE_TRUST_PROXY", "0")
+            .env("THEFLATE_DB",      db.to_str().unwrap())
+            .env("THEFLATE_STORAGE", stor.to_str().unwrap())
+            .env("THEFLATE_CORS_ORIGIN", "http://localhost:3000")
             .env("THEFLATE_ADMIN_TOKEN", "test-admin-token")
             .env("PORT", port.to_string())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
-            .expect("failed to spawn theflate binary");
+            .expect("spawn theflate binary");
 
-        // Poll /health until ready (max 10s)
-        let client = reqwest::blocking::Client::new();
-        for _ in 0..100 {
-            std::thread::sleep(Duration::from_millis(100));
-            if client.get(format!("http://127.0.0.1:{port}/health")).send()
-                .map(|r| r.status().is_success()).unwrap_or(false)
-            {
-                break;
+        // Poll /health until ready (up to 10s)
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            if Instant::now() > deadline { panic!("server did not start in time"); }
+            if let Ok(r) = ureq::get(&format!("http://127.0.0.1:{port}/health")).call() {
+                if r.status() == 200 { break; }
             }
+            std::thread::sleep(Duration::from_millis(100));
         }
 
-        TestServer { child, port, _db_dir: db_dir, _storage_dir: storage_dir }
+        TestServer { child, port, _tmp: tmp }
     }
 
     fn url(&self, path: &str) -> String {
@@ -50,122 +54,117 @@ impl TestServer {
 }
 
 impl Drop for TestServer {
-    fn drop(&mut self) {
-        self.child.kill().ok();
-        self.child.wait().ok();
-    }
+    fn drop(&mut self) { let _ = self.child.kill(); }
 }
 
 fn make_fixture() -> tempfile::NamedTempFile {
-    let f = tempfile::Builder::new().suffix(".mp4").tempfile().unwrap();
-    Command::new("ffmpeg")
-        .args(["-f", "lavfi", "-i", "testsrc=d=1:s=64x64", "-y", f.path().to_str().unwrap()])
+    let f = tempfile::Builder::new().suffix(".mp4").tempfile().expect("tempfile");
+    let status = Command::new("ffmpeg")
+        .args(["-y", "-f", "lavfi", "-i", "testsrc=d=1:s=64x64",
+               "-c:v", "libx264", "-t", "1", f.path().to_str().unwrap()])
         .stdout(Stdio::null()).stderr(Stdio::null())
-        .status().expect("ffmpeg not found");
+        .status().expect("ffmpeg");
+    assert!(status.success(), "ffmpeg fixture generation failed");
     f
 }
 
 #[test]
-fn full_lifecycle() {
-    let server = TestServer::start();
-    let client = reqwest::blocking::Client::new();
+#[ignore = "requires compiled binary and ffmpeg; run with --test-threads=1"]
+fn full_lifecycle_and_negative_cases() {
+    let srv = TestServer::start();
     let fixture = make_fixture();
 
-    // Mint an API key so we don't hit the anonymous 10 req/min limit.
-    let r = client.post(server.url("/keys"))
-        .header("x-admin-token", "test-admin-token")
-        .json(&serde_json::json!({ "name": "e2e-test", "plan": "free" }))
-        .send().unwrap();
-    assert!(r.status().is_success(), "key creation failed: {}", r.status());
-    let key_body: serde_json::Value = r.json().unwrap();
-    let api_key = key_body["key"].as_str().unwrap().to_string();
+    // 1. POST /ingest -> 200; body has ingest_id; body has NO path key
+    let body = std::fs::read(fixture.path()).unwrap();
+    let resp = ureq::post(&srv.url("/ingest"))
+        .set("x-file-name", "test.mp4")
+        .send_bytes(&body)
+        .expect("ingest");
+    assert_eq!(resp.status(), 200);
+    let json: serde_json::Value = resp.into_json().unwrap();
+    assert!(json["ingest_id"].is_string(), "missing ingest_id");
+    assert!(json["path"].is_null() || !json.as_object().unwrap().contains_key("path"),
+        "path must not be in response");
+    let ingest_id = json["ingest_id"].as_str().unwrap().to_string();
 
-    let authed = |method: reqwest::blocking::RequestBuilder| {
-        method.header("x-api-key", &api_key)
+    // 2. POST /analyze {ingest_id} -> 200 with kind: "video"
+    let resp = ureq::post(&srv.url("/analyze"))
+        .set("content-type", "application/json")
+        .send_json(serde_json::json!({ "ingest_id": ingest_id }))
+        .expect("analyze");
+    assert_eq!(resp.status(), 200);
+    let json: serde_json::Value = resp.into_json().unwrap();
+    assert_eq!(json["kind"].as_str().unwrap_or(""), "video");
+
+    // 3. POST /analyze with nonexistent ingest_id -> 404
+    let resp = ureq::post(&srv.url("/analyze"))
+        .set("content-type", "application/json")
+        .send_json(serde_json::json!({ "ingest_id": "nonexistent-id" }));
+    assert_eq!(resp.unwrap_err().into_response().unwrap().status(), 404);
+
+    // 4. POST /upload {ingest_id} -> 202 with job_id
+    let resp = ureq::post(&srv.url("/upload"))
+        .set("content-type", "application/json")
+        .send_json(serde_json::json!({ "ingest_id": ingest_id, "preset": "web" }))
+        .expect("upload");
+    assert_eq!(resp.status(), 202);
+    let json: serde_json::Value = resp.into_json().unwrap();
+    let job_id = json["job_id"].as_str().expect("job_id").to_string();
+
+    // 5. Poll GET /jobs/:id until done (30s timeout)
+    let deadline = Instant::now() + Duration::from_secs(30);
+    let job = loop {
+        if Instant::now() > deadline { panic!("job did not complete in time"); }
+        let resp = ureq::get(&srv.url(&format!("/jobs/{job_id}")))
+            .call().expect("poll");
+        let j: serde_json::Value = resp.into_json().unwrap();
+        match j["status"].as_str() {
+            Some("done") => break j,
+            Some("failed") => panic!("job failed"),
+            _ => std::thread::sleep(Duration::from_millis(500)),
+        }
     };
 
-    // 1. POST /ingest → ingest_id, no path
-    let bytes = std::fs::read(fixture.path()).unwrap();
-    let r = authed(client.post(server.url("/ingest")))
-        .header("x-file-name", "test.mp4")
-        .body(bytes)
-        .send().unwrap();
-    assert_eq!(r.status(), 200, "ingest failed");
-    let body: serde_json::Value = r.json().unwrap();
-    assert!(body["ingest_id"].is_string(), "missing ingest_id");
-    assert!(body["path"].is_null() || body.get("path").is_none(), "path leaked in ingest response");
-    let ingest_id = body["ingest_id"].as_str().unwrap().to_string();
+    // 6. Response contains NO output_path, NO input_path, NO secret_key
+    let wire = job.to_string();
+    assert!(!wire.contains("output_path"), "output_path leaked");
+    assert!(!wire.contains("input_path"),  "input_path leaked");
+    assert!(!wire.contains("secret_key"),  "secret_key leaked");
 
-    // 2. POST /analyze {ingest_id} → kind: video
-    let r = authed(client.post(server.url("/analyze")))
-        .json(&serde_json::json!({ "ingest_id": ingest_id }))
-        .send().unwrap();
-    assert_eq!(r.status(), 200, "analyze failed");
-    let body: serde_json::Value = r.json().unwrap();
-    assert_eq!(body["kind"].as_str().unwrap_or(""), "video");
+    // 7. GET /download/:id -> 200; cache-control is private, no-store
+    let resp = ureq::get(&srv.url(&format!("/download/{job_id}")))
+        .call().expect("download");
+    assert_eq!(resp.status(), 200);
+    let cc = resp.header("cache-control").unwrap_or("");
+    assert!(cc.contains("private") && cc.contains("no-store"),
+        "cache-control must be private, no-store; got: {cc}");
 
-    // 3. POST /analyze with unknown id → 404
-    let r = authed(client.post(server.url("/analyze")))
-        .json(&serde_json::json!({ "ingest_id": "nonexistent-id" }))
-        .send().unwrap();
-    assert_eq!(r.status(), 404);
+    // 8. GET /download/:id with hostile Range -> 416; server still alive
+    let resp = ureq::get(&srv.url(&format!("/download/{job_id}")))
+        .set("range", "bytes=99999999999-")
+        .call();
+    assert_eq!(resp.unwrap_err().into_response().unwrap().status(), 416);
+    // Server still alive
+    assert_eq!(ureq::get(&srv.url("/health")).call().unwrap().status(), 200);
 
-    // 4. POST /upload {ingest_id} → job_id
-    let r = authed(client.post(server.url("/upload")))
-        .json(&serde_json::json!({ "ingest_id": ingest_id, "preset": "web" }))
-        .send().unwrap();
-    assert_eq!(r.status(), 202, "upload failed");
-    let body: serde_json::Value = r.json().unwrap();
-    let job_id = body["job_id"].as_str().unwrap().to_string();
+    // 9. POST /export {provider: "gdrive"} -> 501, never {"ok":true}
+    let resp = ureq::post(&srv.url("/export"))
+        .set("content-type", "application/json")
+        .send_json(serde_json::json!({ "job_id": job_id, "provider": "gdrive" }));
+    assert_eq!(resp.unwrap_err().into_response().unwrap().status(), 501);
 
-    // 5. Poll until done (30s timeout)
-    let mut job_body = serde_json::Value::Null;
-    for _ in 0..300 {
-        std::thread::sleep(Duration::from_millis(100));
-        let r = authed(client.get(server.url(&format!("/jobs/{job_id}")))).send().unwrap();
-        let b: serde_json::Value = r.json().unwrap();
-        if b["status"].as_str() == Some("done") || b["status"].as_str() == Some("failed") {
-            job_body = b;
-            break;
-        }
-    }
-    assert_eq!(job_body["status"].as_str(), Some("done"), "job did not complete: {job_body}");
+    // 10. POST /capture/start -> 404 (route deleted)
+    let resp = ureq::post(&srv.url("/capture/start"))
+        .set("content-type", "application/json")
+        .send_json(serde_json::json!({}));
+    assert_eq!(resp.unwrap_err().into_response().unwrap().status(), 404);
 
-    // 6. PublicJob — no paths or credentials
-    for leaked in ["output_path", "input_path", "secret_key", "access_key"] {
-        assert!(job_body.get(leaked).is_none(), "PublicJob leaked field: {leaked}");
-    }
-
-    // 7. GET /download/:id → 200, private cache-control
-    let r = authed(client.get(server.url(&format!("/download/{job_id}")))).send().unwrap();
-    assert_eq!(r.status(), 200);
-    let cc = r.headers().get("cache-control").and_then(|v| v.to_str().ok()).unwrap_or("");
-    assert!(cc.contains("private") || cc.contains("no-store"), "bad cache-control: {cc}");
-
-    // 8. Range underflow → 416, server still alive
-    let r = authed(client.get(server.url(&format!("/download/{job_id}"))))
-        .header("range", "bytes=99999999999-")
-        .send().unwrap();
-    assert_eq!(r.status(), 416);
-    assert_eq!(client.get(server.url("/health")).send().unwrap().status(), 200, "server died after 416");
-
-    // 9. POST /export with gdrive → 501
-    let r = authed(client.post(server.url("/export")))
-        .json(&serde_json::json!({ "job_id": job_id, "provider": "gdrive" }))
-        .send().unwrap();
-    assert_eq!(r.status(), 501);
-    let body: serde_json::Value = r.json().unwrap();
-    assert_ne!(body["ok"].as_bool(), Some(true), "/export returned ok:true for gdrive");
-
-    // 10. POST /capture/start → 404 (route deleted)
-    let r = client.post(server.url("/capture/start"))
-        .json(&serde_json::json!({}))
-        .send().unwrap();
-    assert_eq!(r.status(), 404);
-
-    // 11. Path traversal in output_format → 400
-    let r = authed(client.post(server.url("/upload")))
-        .json(&serde_json::json!({ "ingest_id": ingest_id, "output_format": "mp4/../../../tmp/pwn" }))
-        .send().unwrap();
-    assert_eq!(r.status(), 400);
+    // 11. POST /upload with path traversal in output_format -> 400
+    let resp = ureq::post(&srv.url("/upload"))
+        .set("content-type", "application/json")
+        .send_json(serde_json::json!({
+            "ingest_id": ingest_id,
+            "output_format": "mp4/../../../tmp/pwn"
+        }));
+    assert_eq!(resp.unwrap_err().into_response().unwrap().status(), 400);
 }

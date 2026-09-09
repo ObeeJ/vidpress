@@ -8,30 +8,26 @@ interface JobProgressProps {
 }
 
 export default function JobProgress({ status, progress }: JobProgressProps) {
-  const indeterminate = status === "queued";
+  const indeterminate = status === "queued" || status === "processing" && progress === 0;
+
+  if (indeterminate) {
+    return <div className="track" style={{ height: 4, borderRadius: "var(--radius-full)" }} />;
+  }
 
   return (
-    <div
-      className={indeterminate ? "track" : undefined}
-      style={{
-        height: 3,
-        borderRadius: 99,
-        background: "#18181b",
-        overflow: "hidden",
-        position: "relative",
-      }}
-    >
-      {!indeterminate && (
-        <div
-          style={{
-            height: "100%",
-            width: `${progress}%`,
-            background: "var(--color-signal, #C9F24E)",
-            borderRadius: 99,
-            transition: "width var(--dur-2, 0.2s) ease",
-          }}
-        />
-      )}
+    <div style={{
+      height: 4,
+      borderRadius: "var(--radius-full)",
+      background: "var(--color-surface-2)",
+      overflow: "hidden",
+    }}>
+      <div style={{
+        height: "100%",
+        width: `${progress}%`,
+        background: "var(--color-signal)",
+        borderRadius: "var(--radius-full)",
+        transition: `width var(--dur-2) var(--ease-out)`,
+      }} />
     </div>
   );
 }
