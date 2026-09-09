@@ -6,6 +6,7 @@
 
 pub mod auth;
 pub mod db;
+pub mod export;
 pub mod handlers;
 pub mod ingest_store;
 pub mod jobs;

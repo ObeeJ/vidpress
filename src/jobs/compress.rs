@@ -1,6 +1,5 @@
 use std::time::Duration;
 use tokio::process::Command;
-use uuid::Uuid;
 use crate::{
     db::upsert_job,
     jobs::model::JobStatus,
@@ -132,15 +131,22 @@ pub async fn run(
                 job.compressed_bytes = compressed_bytes;
                 job.progress = 100;
                 job.eta_secs = 0;
-                if let Some(ref dest) = job.destination {
-                    let bucket = dest.bucket.as_deref().unwrap_or("vpx-media-bucket");
-                    let endpoint = dest.endpoint.as_deref().unwrap_or("s3.amazonaws.com");
-                    let path = dest.target_path.as_deref().unwrap_or("vpx_output.mp4");
-                    job.remote_url = Some(match dest.provider.as_str() {
-                        "s3" | "r2" | "supabase" | "b2" => format!("https://{}.{}/{}", bucket, endpoint.trim_start_matches("https://"), path),
-                        "gdrive" => format!("https://drive.google.com/file/d/vpx_{}", Uuid::new_v4().to_string().replace('-', "")),
-                        "dropbox" => format!("https://dropbox.com/home/vpx_exports/{}", path),
-                        _ => format!("https://export.vpxengine.com/{}", path),
+                if let Some(ref dest) = job.destination.clone() {
+                    let output_path = job.output_path.clone();
+                    let dest = dest.clone();
+                    let job_id = job.id.clone();
+                    let db2 = db.clone();
+                    let jobs2 = jobs.clone();
+                    tokio::spawn(async move {
+                        match crate::export::s3::upload(&dest, &output_path).await {
+                            Ok(url) => {
+                                if let Some(j) = jobs2.lock().unwrap().get_mut(&job_id) {
+                                    j.remote_url = Some(url);
+                                    upsert_job(&db2, j);
+                                }
+                            }
+                            Err(e) => tracing::error!("auto-export failed for {job_id}: {e}"),
+                        }
                     });
                 }
                 let job_clone = job.clone();

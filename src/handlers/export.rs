@@ -1,49 +1,54 @@
 use glideapi::{FromRequest, Request, Response, State};
 use glideapi_macros::post;
-use uuid::Uuid;
-use crate::{auth::auth_and_rate, db::get_job, jobs::model::JobStatus, state::AppState};
+use crate::{auth::auth_and_rate, handlers::analyze::json_err, jobs::model::JobStatus, state::AppState};
 
 #[post("/export")]
 pub async fn export(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
-    if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
+    let caller = match auth_and_rate(&req, &state.db) { Ok(c) => c, Err(r) => return r };
 
     let body: serde_json::Value = match serde_json::from_slice(&req.body) {
         Ok(v) => v,
-        Err(_) => return Response { status: 400, body: r#"{"error":"invalid json"}"#.into(), ..Default::default() },
+        Err(_) => return json_err(400, "invalid json"),
     };
     let job_id = match body["job_id"].as_str() {
         Some(j) => j,
-        None    => return Response { status: 400, body: r#"{"error":"missing job_id"}"#.into(), ..Default::default() },
-    };
-    let job = state.jobs.lock().unwrap().get(job_id).cloned()
-        .or_else(|| get_job(&state.db, job_id));
-    let file_path = match job {
-        Some(j) if matches!(j.status, JobStatus::Done) => j.output_path,
-        Some(_) => return Response { status: 409, body: r#"{"error":"job not completed yet"}"#.into(), ..Default::default() },
-        None    => return Response { status: 404, body: r#"{"error":"job not found"}"#.into(), ..Default::default() },
+        None    => return json_err(400, "missing job_id"),
     };
 
-    let provider    = body["provider"].as_str().unwrap_or("s3");
-    let target_path = body["target_path"].as_str().unwrap_or("vpx_output.mp4");
-    let remote_url  = match provider {
-        "s3"|"r2"|"supabase"|"b2" => {
-            let bucket   = body["bucket"].as_str().unwrap_or("vpx-media-bucket");
-            let endpoint = body["endpoint"].as_str().unwrap_or("s3.amazonaws.com");
-            format!("https://{}.{}/{}", bucket, endpoint.trim_start_matches("https://"), target_path)
-        }
-        "gdrive"  => format!("https://drive.google.com/file/d/vpx_{}", Uuid::new_v4().to_string().replace('-', "")),
-        "dropbox" => format!("https://dropbox.com/home/vpx_exports/{}", target_path),
-        _         => format!("https://export.vpxengine.com/{}", target_path),
+    let job = state.jobs.lock().unwrap_or_else(|e| e.into_inner()).get(job_id).cloned()
+        .or_else(|| crate::db::get_job_for(&state.db, job_id, caller.as_ref().map(|k| k.key.as_str())));
+    let (file_path, dest) = match job {
+        Some(j) if matches!(j.status, JobStatus::Done) => (j.output_path, j.destination),
+        Some(_) => return json_err(409, "job not completed yet"),
+        None    => return json_err(404, "job not found"),
+    };
+
+    // Use destination from the job, or build one from request body.
+    let cfg = dest.unwrap_or_else(|| crate::jobs::model::DestinationConfig {
+        provider:     body["provider"].as_str().unwrap_or("s3").to_string(),
+        bucket:       body["bucket"].as_str().map(String::from),
+        endpoint:     body["endpoint"].as_str().map(String::from),
+        region:       body["region"].as_str().map(String::from),
+        access_key:   body["access_key"].as_str().map(String::from),
+        secret_key:   body["secret_key"].as_str().map(String::from),
+        access_token: None,
+        target_path:  body["target_path"].as_str().map(String::from),
+    });
+
+    let remote_url = match cfg.provider.as_str() {
+        "s3" | "r2" | "b2" | "supabase" => match crate::export::s3::upload(&cfg, &file_path).await {
+            Ok(url) => url,
+            Err(e) => { tracing::error!("export failed: {e}"); return json_err(502, "export failed"); }
+        },
+        // Fabricating a URL for a provider we don't support is worse than saying no. (C7)
+        "gdrive" | "dropbox" => return json_err(501, "provider not yet supported"),
+        _ => return json_err(400, "unknown provider"),
     };
 
     Response {
         status: 200,
-        body: serde_json::json!({
-            "ok": true, "job_id": job_id, "provider": provider,
-            "status": "exported", "remote_url": remote_url,
-            "bytes_transferred": std::fs::metadata(&file_path).map(|m| m.len()).unwrap_or(0)
-        }).to_string().into(),
+        body: serde_json::json!({ "ok": true, "job_id": job_id, "remote_url": remote_url }).to_string().into(),
         ..Default::default()
     }
 }

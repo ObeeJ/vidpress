@@ -33,6 +33,11 @@ pub async fn upload(req: Request) -> Response {
     let webhook_url   = body["webhook_url"].as_str().map(String::from);
     if let Some(ref wh) = webhook_url {
         if !crate::webhook::is_public_url(wh) {
+            return json_err(400, "invalid or disallowed webhook_url");
+        }
+    }
+    if let Some(ref wh) = webhook_url {
+        if !crate::webhook::is_public_url(wh) {
             return json_err(400, "webhook_url is not a public URL");
         }
     }
