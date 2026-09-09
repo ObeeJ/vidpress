@@ -9,7 +9,12 @@ use crate::{auth::auth_and_rate, db::get_job_for, jobs::model::JobStatus, state:
 pub async fn transcribe(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
     let caller = match auth_and_rate(&req, &state.db) { Ok(c) => c, Err(r) => return r };
-    let model  = if caller.as_ref().map(|k| k.plan == "premium").unwrap_or(false) { "medium" } else { "base" };
+
+    // --- BILLING / TIERED PLAN MODEL SELECTION ---
+    // Previously: premium plan required for "medium" model.
+    // Commented/overridden to grant all users free access to the "medium" Whisper model.
+    // let model = if caller.as_ref().map(|k| k.plan == "premium").unwrap_or(false) { "medium" } else { "base" };
+    let model = "medium";
 
     let body: serde_json::Value = match serde_json::from_slice(&req.body) {
         Ok(v) => v,

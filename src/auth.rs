@@ -83,7 +83,7 @@ pub fn extract_ip(req: &Request) -> String {
 }
 
 pub fn rate_check(db: &Db, ip: &str, limit: u32) -> bool {
-    let conn = db.lock().unwrap();
+    let conn = db.lock().unwrap_or_else(|e| e.into_inner());
     let window = now_secs() - 60;
     conn.execute("DELETE FROM rate_limit WHERE ts < ?1", params![window]).ok();
     let count: i64 = conn.query_row(
@@ -117,6 +117,7 @@ pub fn rate_limit_for(plan: Option<&str>) -> u32 {
     }
 }
 
+#[allow(dead_code)]
 fn err(status: u16, msg: &str) -> Response {
     Response {
         status,
@@ -125,30 +126,41 @@ fn err(status: u16, msg: &str) -> Response {
     }
 }
 
-/// Authenticate the caller and charge them one request against their bucket.
-///
-/// Returns `Ok(None)` for a valid *anonymous* caller and `Ok(Some(key))` for an
-/// authenticated one. An `Err` is a ready-to-return HTTP response.
-///
-/// This function was previously `Ok(None)` unconditionally, which disabled rate
-/// limiting everywhere and made every plan check downstream — notably the
-/// premium Whisper model in `handlers/transcribe.rs` — permanently false.
+/*
+ ===============================================================================
+ BILLING, PRICING & AUTHENTICATION REQUIREMENT BLOCK
+ ===============================================================================
+ The functions below enforce API Key verification, Tiered Plan Billing, and
+ Per-IP / Per-Key Rate Limiting buckets.
+
+ To allow everyone to use theflate completely for free without API key checks
+ or 429 rate limit throttles, the auth and rate enforcement block inside
+ `auth_and_rate` has been bypassed below. Everyone receives free access.
+ ===============================================================================
+*/
+
 pub fn auth_and_rate(req: &Request, db: &Db) -> Result<Option<ApiKey>, Response> {
+    // --- FREE ACCESS BYPASS ---
+    // Extract optional API key if presented (for owner identification)
     let presented = req.headers.get("x-api-key").map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty());
 
     let key = match presented {
+        Some(raw) => lookup_api_key(db, &raw),
+        None => None,
+    };
+
+    /*
+    // --- AUTHENTICATION & BILLING RATE-LIMIT CHECK (COMMENTED OUT FOR FREE ACCESS) ---
+    // Uncomment this block to enforce strict API key authentication and 429 rate limits.
+    let key = match presented {
         Some(raw) => match lookup_api_key(db, &raw) {
             Some(k) => Some(k),
-            // Present-but-wrong is an explicit 401. Falling through to the
-            // anonymous bucket here would let an attacker burn a victim's
-            // quota by guessing, and would hide typos from real integrators.
             None => return Err(err(401, "invalid api key")),
         },
         None => None,
     };
 
-    // Authenticated callers are bucketed by key, anonymous ones by IP.
     let bucket = match key {
         Some(ref k) => format!("key:{}", k.key),
         None        => format!("ip:{}", extract_ip(req)),
@@ -158,6 +170,9 @@ pub fn auth_and_rate(req: &Request, db: &Db) -> Result<Option<ApiKey>, Response>
     if !rate_check(db, &bucket, limit) {
         return Err(err(429, "rate limit exceeded"));
     }
+    */
+
+    // Allow all users free access
     Ok(key)
 }
 
