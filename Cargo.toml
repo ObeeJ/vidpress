@@ -3,6 +3,17 @@ name = "theflate"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "theflate"
+path = "src/lib.rs"
+
+[[bin]]
+name = "theflate"
+path = "src/main.rs"
+
+[dev-dependencies]
+tempfile = "3"
+
 [dependencies]
 glideapi = { path = "../glideapi" }
 glideapi_macros = { path = "../glideapi/glideapi_macros" }

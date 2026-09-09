@@ -1,17 +1,9 @@
-mod auth;
-mod db;
-mod jobs;
-mod media;
-mod handlers;
-mod state;
-mod webhook;
-mod ws;
-
+use theflate::{db, jobs, state, ws};
+use theflate::state::{AppState, cors_origin, db_path, detect_hw};
 use std::{collections::HashMap, sync::{Arc, Mutex}, time::Duration};
 use glideapi::{App, Config};
 use rusqlite::Connection;
 use tokio::sync::Semaphore;
-use state::{AppState, cors_origin, db_path, detect_hw};
 
 #[tokio::main]
 async fn main() {
