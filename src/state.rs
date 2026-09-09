@@ -2,13 +2,11 @@ use std::{collections::HashMap, sync::{Arc, Mutex}};
 use rusqlite::Connection;
 use tokio::sync::Semaphore;
 use crate::jobs::model::Job;
-use crate::jobs::capture::CaptureStore;
 use crate::jobs::stream::StreamStore;
 
 pub type Db       = Arc<Mutex<Connection>>;
 pub type JobStore = Arc<Mutex<HashMap<String, Job>>>;
 
-/// Hardware encoder available on this machine (detected once at startup).
 #[derive(Debug, Clone, PartialEq)]
 pub enum HwEncoder { Nvenc, Vaapi, Software }
 
@@ -17,9 +15,7 @@ pub struct AppState {
     pub jobs:       JobStore,
     pub db:         Db,
     pub hw:         HwEncoder,
-    /// Limits concurrent ffmpeg processes to avoid OOM / thrashing.
     pub job_sem:    Arc<Semaphore>,
-    pub captures:   CaptureStore,
     pub streams:    StreamStore,
 }
 

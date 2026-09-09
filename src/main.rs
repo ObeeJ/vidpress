@@ -28,7 +28,6 @@ async fn main() {
         db:       Arc::new(Mutex::new(conn)),
         hw,
         job_sem:  Arc::new(Semaphore::new(max_jobs)),
-        captures: jobs::capture::new_store(),
         streams:  jobs::stream::new_store(),
     };
 
