@@ -2,16 +2,15 @@ use glideapi::{FromRequest, Request, Response, State};
 use glideapi_macros::get;
 use crate::{auth::auth_and_rate, db::get_job, state::AppState};
 
-/// Streams the output file as it's being written by ffmpeg.
-/// Uses HTTP range-style chunked delivery — browser <video> can play
-/// a fragmented MP4 before the job is done.
+const MAX_PREVIEW: usize = 4 * 1024 * 1024;
+
 #[get("/preview/:id")]
 pub async fn preview(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
     if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
 
     let id = req.params.get("id").cloned().unwrap_or_default();
-    let job = state.jobs.lock().unwrap().get(&id).cloned()
+    let job = state.jobs.lock().unwrap_or_else(|e| e.into_inner()).get(&id).cloned()
         .or_else(|| get_job(&state.db, &id));
 
     let job = match job {
@@ -19,11 +18,15 @@ pub async fn preview(req: Request) -> Response {
         None => return Response { status: 404, body: r#"{"error":"job not found"}"#.into(), ..Default::default() },
     };
 
-    // Read however many bytes exist right now — even if ffmpeg is mid-write
-    let bytes = match std::fs::read(&job.output_path) {
-        Ok(b) if !b.is_empty() => b,
-        _ => return Response { status: 204, body: r#"{"error":"no data yet"}"#.into(), ..Default::default() },
+    use tokio::io::AsyncReadExt;
+    let mut f = match tokio::fs::File::open(&job.output_path).await {
+        Ok(f) => f,
+        Err(_) => return Response { status: 204, ..Default::default() },
     };
+    let mut bytes = Vec::new();
+    if f.take(MAX_PREVIEW as u64).read_to_end(&mut bytes).await.is_err() || bytes.is_empty() {
+        return Response { status: 204, ..Default::default() };
+    }
 
     let ct = content_type_for(&job.output_path);
     Response::binary(200, bytes, ct)
