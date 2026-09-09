@@ -26,7 +26,7 @@ export default function Navbar() {
 
   return (
     <header style={{ borderBottom: "1px solid var(--border)", background: "rgba(0, 0, 0, 0.95)", position: "sticky", top: 0, zIndex: 50 }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div className="measure" style={{ padding: "14px 0", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <Link href="/" style={{ textDecoration: "none" }}>
           <TheflateLogo />
         </Link>

@@ -18,30 +18,38 @@ export default function Home() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#000000" }}>
       <Navbar />
 
-      <main style={{ flex: 1, maxWidth: 900, width: "100%", margin: "0 auto", padding: "48px 20px 80px", display: "flex", flexDirection: "column", gap: 32 }}>
+      <main className="measure" style={{ flex: 1, padding: "48px 0 80px", display: "flex", flexDirection: "column", gap: 32 }}>
         
-        {/* Simple & Clean Hero Section */}
+        {/* Hero */}
         <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-          <h1 style={{ fontSize: 46, fontWeight: 900, letterSpacing: "-1.5px", color: "#ffffff", lineHeight: 1.1, maxWidth: 760 }}>
+          <h1 className="display" style={{ color: "#ffffff", maxWidth: 760 }}>
             Deflate any file. Instantly.
           </h1>
 
-          <p style={{ fontSize: 16, color: "#a1a1aa", maxWidth: 580, lineHeight: 1.6 }}>
+          <p className="lede">
             Theflate video, audio, and images by up to 90% with zero visible quality loss. High-speed media processing for developers and creators.
           </p>
         </div>
 
         {/* Action Input Mode Selector */}
-        <div style={{ display: "flex", background: "#09090b", border: "1px solid #27272a", borderRadius: 10, padding: 4, gap: 2 }}>
+        <div role="tablist" style={{ display: "flex", background: "#09090b", border: "1px solid #27272a", borderRadius: 10, padding: 4, gap: 2 }}>
           {([
-            { id: "upload", label: "Upload & Theflate" },
+            { id: "upload", label: "Upload" },
             { id: "url",    label: "Social Link" },
-            { id: "screen", label: "Screen Record" },
+            { id: "screen", label: "Screen" },
             { id: "live",   label: "Live" },
           ] as const).map(({ id, label }) => (
             <button
               key={id}
+              role="tab"
+              aria-selected={activeTab === id}
               onClick={() => setActiveTab(id)}
+              onKeyDown={(e) => {
+                const tabs = ["upload", "url", "screen", "live"] as const;
+                const i = tabs.indexOf(id);
+                if (e.key === "ArrowRight") setActiveTab(tabs[(i + 1) % tabs.length]);
+                if (e.key === "ArrowLeft")  setActiveTab(tabs[(i - 1 + tabs.length) % tabs.length]);
+              }}
               style={{
                 flex: 1,
                 padding: "10px 8px",
@@ -52,7 +60,7 @@ export default function Home() {
                 cursor: "pointer",
                 background: activeTab === id ? "#18181b" : "transparent",
                 color: activeTab === id ? "#ffffff" : "#71717a",
-                transition: "all 0.15s ease",
+                transition: "background-color 0.15s ease, color 0.15s ease",
                 whiteSpace: "nowrap",
               }}
             >
@@ -73,8 +81,10 @@ export default function Home() {
             <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>
               Active Queue ({files.length})
             </div>
-            {files.map((item) => (
-              <FileCard key={item.localUrl} item={item} />
+            {files.map((item, index) => (
+              <div key={item.localUrl} className="reveal" style={{ "--i": index } as React.CSSProperties}>
+                <FileCard item={item} />
+              </div>
             ))}
           </div>
         )}
