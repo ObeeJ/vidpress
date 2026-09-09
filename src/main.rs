@@ -1,4 +1,4 @@
-use theflate::{db, jobs, state, ws};
+use theflate::{db, jobs, ws};
 use theflate::state::{AppState, cors_origin, db_path, detect_hw};
 use std::{collections::HashMap, sync::{Arc, Mutex}, time::Duration};
 use glideapi::{App, Config};

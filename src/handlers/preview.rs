@@ -22,7 +22,7 @@ pub async fn preview(req: Request) -> Response {
     };
 
     use tokio::io::AsyncReadExt;
-    let mut f = match tokio::fs::File::open(&job.output_path).await {
+    let f = match tokio::fs::File::open(&job.output_path).await {
         Ok(f) => f,
         Err(_) => return Response { status: 204, ..Default::default() },
     };
