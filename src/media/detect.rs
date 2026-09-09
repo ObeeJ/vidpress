@@ -105,10 +105,11 @@ pub async fn detect_with_hw(path: &str, hw: &HwEncoder) -> Result<MediaProfile, 
 
     if matches!(audio_codec.as_str(), "flac"|"pcm_s16le"|"pcm_s24le"|"pcm_f32le"|"aiff") {
         let ext = match input_ext.as_str() { "flac"|"wav"|"aiff"|"aif" => input_ext.as_str(), _ => "flac" }.to_string();
+        let args = if ext == "ogg" { s(&["-c:a","libvorbis","-q:a","6","-vn"]) } else { s(&["-c:a","aac","-b:a","192k","-vn"]) };
         return Ok(MediaProfile {
             kind: MediaKind::AudioLossless, codec_name: audio_codec, duration_secs,
             size_bytes, width: None, height: None,
-            ffmpeg_args: s(&["-c:a","aac","-b:a","192k","-vn"]),
+            ffmpeg_args: args,
             output_ext: ext,
             available_formats: vec!["mp3".into(),"m4a".into(),"ogg".into(),"flac".into(),"wav".into()],
             estimated_output_mb: duration_secs * 192.0 / 8.0 / 1024.0,
@@ -118,10 +119,11 @@ pub async fn detect_with_hw(path: &str, hw: &HwEncoder) -> Result<MediaProfile, 
 
     if audio_stream.is_some() {
         let ext = match input_ext.as_str() { "mp3"|"m4a"|"ogg"|"aac"|"opus" => input_ext.as_str(), _ => "mp3" }.to_string();
+        let args = if ext == "ogg" { s(&["-c:a","libvorbis","-q:a","6","-vn"]) } else { s(&["-c:a","aac","-b:a","128k","-vn"]) };
         return Ok(MediaProfile {
             kind: MediaKind::AudioLossy, codec_name: audio_codec, duration_secs,
             size_bytes, width: None, height: None,
-            ffmpeg_args: s(&["-c:a","aac","-b:a","128k","-vn"]),
+            ffmpeg_args: args,
             output_ext: ext,
             available_formats: vec!["mp3".into(),"m4a".into(),"ogg".into(),"aac".into()],
             estimated_output_mb: duration_secs * 128.0 / 8.0 / 1024.0,

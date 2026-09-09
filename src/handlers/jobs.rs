@@ -47,7 +47,10 @@ pub async fn download(req: Request) -> Response {
     let caller = match auth_and_rate(&req, &state.db) { Ok(c) => c, Err(r) => return r };
     let id = req.params.get("id").cloned().unwrap_or_default();
     let caller_key = caller.as_ref().map(|k| k.key.as_str());
-    let job = get_job_for(&state.db, &id, caller_key);
+    let job = {
+        let store = state.jobs.lock().unwrap_or_else(|e| e.into_inner());
+        store.get(&id).filter(|j| j.owner_key.as_deref() == caller_key).cloned()
+    }.or_else(|| get_job_for(&state.db, &id, caller_key));
     match job {
         Some(j) if matches!(j.status, JobStatus::Done) => {
             let meta = match std::fs::metadata(&j.output_path) {

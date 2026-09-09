@@ -92,7 +92,8 @@ pub fn upsert_job(db: &Db, job: &Job) {
          ON CONFLICT(id) DO UPDATE SET
            status=excluded.status, progress=excluded.progress, eta_secs=excluded.eta_secs,
            compressed_bytes=excluded.compressed_bytes, output_path=excluded.output_path,
-           destination_json=excluded.destination_json, remote_url=excluded.remote_url",
+           destination_json=excluded.destination_json, remote_url=excluded.remote_url,
+           owner_key=excluded.owner_key",
         params![
             job.id,
             format!("{:?}", job.status).to_lowercase(),
@@ -120,11 +121,11 @@ fn map_job_row(row: &rusqlite::Row) -> rusqlite::Result<Job> {
             _            => JobStatus::Queued,
         },
         media_kind: match kind_str.as_str() {
-            "audio_lossless" => MediaKind::AudioLossless,
-            "audio_lossy"    => MediaKind::AudioLossy,
-            "image_animated" => MediaKind::ImageAnimated,
-            "image_static"   => MediaKind::ImageStatic,
-            _                => MediaKind::Video,
+            "audiolossless" | "audio_lossless" => MediaKind::AudioLossless,
+            "audiolossy" | "audio_lossy"       => MediaKind::AudioLossy,
+            "imageanimated" | "image_animated" => MediaKind::ImageAnimated,
+            "imagestatic" | "image_static"     => MediaKind::ImageStatic,
+            _                                  => MediaKind::Video,
         },
         input_path:       row.get(3)?,
         output_path:      row.get(4)?,
@@ -161,11 +162,17 @@ pub fn get_job(db: &Db, id: &str) -> Option<Job> {
 /// "not found" and "wrong owner" so it is not an existence oracle.
 pub fn get_job_for(db: &Db, id: &str, caller: Option<&str>) -> Option<Job> {
     let conn = db.lock().unwrap_or_else(|e| e.into_inner());
-    conn.query_row(
+    match conn.query_row(
         &format!("{JOB_SELECT} WHERE id=?1 AND owner_key IS ?2"),
         params![id, caller],
         map_job_row,
-    ).ok()
+    ) {
+        Ok(job) => Some(job),
+        Err(e) => {
+            tracing::error!("get_job_for failed for id={id}, caller={caller:?}: {e}");
+            None
+        }
+    }
 }
 
 pub fn load_all_jobs(conn: &Connection) -> Vec<Job> {

@@ -3,7 +3,7 @@ use tokio::process::Command;
 use crate::{
     db::upsert_job,
     jobs::model::JobStatus,
-    media::detect::MediaProfile,
+    media::detect::{MediaKind, MediaProfile},
     media::ffmpeg_args::preset_ffmpeg_args,
     state::{Db, HwEncoder, JobStore},
     webhook,
@@ -38,7 +38,14 @@ pub async fn run(
 
     let progress_file = format!("{}/{id}_progress", crate::state::storage_dir());
     let duration = profile.duration_secs;
-    let ffmpeg_args = if let Some(mb) = target_mb.filter(|_| preset.is_none()) {
+    let ffmpeg_args = if profile.kind == MediaKind::AudioLossy || profile.kind == MediaKind::AudioLossless {
+        if let Some(mb) = target_mb {
+            let audio_kbps = (((mb * 8.0 * 1024.0) / profile.duration_secs.max(1.0)) as u64).clamp(32, 320);
+            vec!["-c:a".into(), "aac".into(), "-b:a".into(), format!("{audio_kbps}k"), "-vn".into()]
+        } else {
+            profile.ffmpeg_args.clone()
+        }
+    } else if let Some(mb) = target_mb.filter(|_| preset.is_none()) {
         // Cap target_mb to prevent absurd bitrates that fill the disk. (M11)
         const MAX_TARGET_MB: f64 = 10_240.0;
         let mb = mb.clamp(0.1, MAX_TARGET_MB);
