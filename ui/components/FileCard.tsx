@@ -6,6 +6,7 @@ import { ingestFile, analyzeFile, uploadFile, downloadFile, getJob, transcribeFi
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "@/lib/toast";
 import Button from "@/components/primitives/Button";
+import CountUp from "@/components/CountUp";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 
@@ -375,10 +376,16 @@ export default function FileCard({ item }: { item: FileItem }) {
         {/* Done State */}
         {job?.status === "done" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "12px 14px" }}>
+            {/* Contract gesture — the signature motion moment */}
+            <div className="contract tabular" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "12px 14px" }}>
               {stat("Original", fmt(job.original_bytes))}
-              {stat("Theflated", fmt(job.compressed_bytes), "#10b981")}
-              {stat("Deflation", `${(((job.original_bytes - job.compressed_bytes) / job.original_bytes) * 100).toFixed(1)}%`, "#10b981")}
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-signal, #C9F24E)" }}>
+                  <CountUp from={job.original_bytes} to={job.compressed_bytes} format={fmt} durationMs={560} />
+                </span>
+                <span style={{ fontSize: 11, color: "#71717a" }}>Theflated</span>
+              </div>
+              {stat("Saved", `${(((job.original_bytes - job.compressed_bytes) / job.original_bytes) * 100).toFixed(1)}%`, "var(--color-signal, #C9F24E)")}
             </div>
 
             {/* Media Preview */}
