@@ -31,6 +31,11 @@ pub async fn upload(req: Request) -> Response {
     };
 
     let webhook_url   = body["webhook_url"].as_str().map(String::from);
+    if let Some(ref wh) = webhook_url {
+        if !crate::webhook::is_public_url(wh) {
+            return json_err(400, "webhook_url is not a public URL");
+        }
+    }
     let preset        = body["preset"].as_str().map(String::from);
     let output_format = body["output_format"].as_str().map(String::from);
     let target_mb     = body["target_mb"].as_f64();

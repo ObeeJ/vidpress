@@ -9,23 +9,6 @@ use crate::{
     state::{AppState, storage_dir},
 };
 
-fn is_safe_url(url: &str) -> bool {
-    let url = url.trim();
-    if !url.starts_with("http://") && !url.starts_with("https://") { return false; }
-    let after = url.splitn(2, "://").nth(1).unwrap_or("");
-    let host  = after.splitn(2, '/').next().unwrap_or("");
-    let host  = if host.starts_with('[') { host.splitn(2, ']').next().unwrap_or(host) }
-                else { host.splitn(2, ':').next().unwrap_or(host) };
-    let blocked = ["localhost","127.","0.0.0.0","169.254.","10.","192.168.","[::1]","[::]"];
-    let is_172_private = host.starts_with("172.") && {
-        host.splitn(3, '.').nth(1)
-            .and_then(|s| s.parse::<u8>().ok())
-            .map(|n| (16..=31).contains(&n))
-            .unwrap_or(false)
-    };
-    !is_172_private && !blocked.iter().any(|b| host.starts_with(b))
-}
-
 #[post("/download-url")]
 pub async fn download_url(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
@@ -39,12 +22,17 @@ pub async fn download_url(req: Request) -> Response {
         Some(u) => u.to_string(),
         None    => return Response { status: 400, body: r#"{"error":"missing url"}"#.into(), ..Default::default() },
     };
-    if !is_safe_url(&url) {
+    if !crate::webhook::is_public_url(&url) {
         return Response { status: 400, body: r#"{"error":"invalid or disallowed url"}"#.into(), ..Default::default() };
     }
 
     let audio_only  = body["audio_only"].as_bool().unwrap_or(false);
     let webhook_url = body["webhook_url"].as_str().map(String::from);
+    if let Some(ref wh) = webhook_url {
+        if !crate::webhook::is_public_url(wh) {
+            return Response { status: 400, body: r#"{"error":"webhook_url is not a public URL"}"#.into(), ..Default::default() };
+        }
+    }
     let destination: Option<DestinationConfig> = serde_json::from_value(body["destination"].clone()).ok();
     let id          = Uuid::new_v4().to_string();
     let out_dir     = storage_dir();
