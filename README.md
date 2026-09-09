@@ -54,15 +54,17 @@ All requests accept `x-api-key: vp_YOUR_KEY` header. Anonymous requests are rate
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `POST` | `/ingest` | optional | Upload file bytes → returns server path |
+| `POST` | `/ingest` | optional | Upload file bytes → returns `ingest_id` |
 | `POST` | `/analyze` | optional | Analyze file → codec, size, format options |
 | `POST` | `/upload` | optional | Queue compression job |
-| `GET` | `/jobs/:id` | optional | Poll job status |
+| `GET` | `/jobs/:id` | optional | Poll job status (no paths or credentials in response) |
 | `GET` | `/download/:id` | optional | Download compressed output |
 | `POST` | `/download-url` | premium | Download from YouTube/IG/TikTok/X |
-| `POST` | `/transcribe` | premium | Transcribe audio/video to text |
+| `POST` | `/transcribe` | premium | Transcribe audio/video to text (async, returns `transcription_id`) |
 | `GET` | `/transcriptions/:id` | optional | Get transcription result |
-| `POST` | `/keys` | none | Create API key |
+| `POST` | `/export` | optional | Export to S3/R2/B2/Supabase |
+| `GET` | `/preview/:id` | optional | Preview first 4MB of output |
+| `POST` | `/keys` | admin | Create API key (requires `x-admin-token`) |
 | `GET` | `/health` | none | Health check |
 
 ### Rate limits
@@ -84,12 +86,13 @@ curl -X POST http://localhost:8080/ingest \
   -H "x-file-name: video.mp4" \
   -H "x-api-key: vp_YOUR_KEY" \
   --data-binary @video.mp4
+# → {"ingest_id":"<uuid>"}
 
 # 2. Compress
 curl -X POST http://localhost:8080/upload \
   -H "content-type: application/json" \
   -H "x-api-key: vp_YOUR_KEY" \
-  -d '{"path":"/tmp/theflate_output/abc_video.mp4","preset":"web","webhook_url":"https://yourapp.com/hook"}'
+  -d '{"ingest_id":"<uuid>","preset":"web","webhook_url":"https://yourapp.com/hook"}'
 
 # 3. Poll
 curl http://localhost:8080/jobs/JOB_ID -H "x-api-key: vp_YOUR_KEY"
@@ -109,16 +112,29 @@ When a job completes, theflate POSTs to your `webhook_url`:
   "media_kind": "video",
   "original_bytes": 408449822,
   "compressed_bytes": 46124172,
-  "output_path": "/tmp/theflate_output/uuid_output.mp4",
   "duration_secs": 138.3,
   "progress": 100,
-  "eta_secs": 0
+  "eta_secs": 0,
+  "has_destination": false
 }
 ```
 
-Header: `x-theflate-event: job.done`
+Header: `x-theflate-event: job.done`  
+Signature: `x-theflate-signature: t=<unix_ts>,v1=<hex_hmac_sha256>`
 
-Respond with HTTP 2xx to acknowledge. Retries 3 times with exponential backoff on failure.
+Verify the signature (Node.js example):
+```js
+const crypto = require("crypto");
+function verify(secret, body, sigHeader) {
+  const [tPart, vPart] = sigHeader.split(",");
+  const ts = tPart.split("=")[1];
+  const expected = crypto.createHmac("sha256", secret)
+    .update(`${ts}.${body}`).digest("hex");
+  return crypto.timingSafeEqual(Buffer.from(vPart.split("=")[1]), Buffer.from(expected));
+}
+```
+
+Respond with HTTP 2xx to acknowledge. Retries on 5xx/429 only (3 attempts, exponential backoff).
 
 ## Pricing
 
