@@ -8,7 +8,6 @@ import FileCard from "@/components/FileCard";
 import UrlDownloader from "@/components/UrlDownloader";
 import ScreenRecorder from "@/components/ScreenRecorder";
 import LiveStream from "@/components/LiveStream";
-import DeflationPipelineAnimation from "@/components/DeflationPipelineAnimation";
 import { useStore } from "@/lib/store";
 
 export default function Home() {
@@ -31,9 +30,6 @@ export default function Home() {
             Theflate video, audio, and images by up to 90% with zero visible quality loss. High-speed media processing for developers and creators.
           </p>
         </div>
-
-        {/* Vector Motion Pipeline Animation */}
-        <DeflationPipelineAnimation />
 
         {/* Action Input Mode Selector */}
         <div style={{ display: "flex", background: "#09090b", border: "1px solid #27272a", borderRadius: 10, padding: 4, gap: 2 }}>
