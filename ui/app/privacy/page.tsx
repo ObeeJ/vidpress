@@ -2,7 +2,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 export const metadata = {
-  title: "Privacy Policy — theflate",
+  title: "Privacy Policy | theflate",
   description: "Privacy policy, data retention, and automated file cleanup policy for theflate.",
 };
 

@@ -83,7 +83,7 @@ export default function UrlDownloader() {
       {status && status !== "done" && status !== "failed" && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, background: "#121215", border: "1px solid #27272a", fontSize: 13, color: "#f4f4f5" }}>
           <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} />
-          <span><strong style={{ color: "#ffffff", textTransform: "capitalize" }}>{status}</strong> — Downloading...</span>
+          <span><strong style={{ color: "#ffffff", textTransform: "capitalize" }}>{status}</strong>: Downloading...</span>
         </div>
       )}
 

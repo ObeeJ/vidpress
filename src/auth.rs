@@ -143,7 +143,14 @@ pub fn auth_and_rate(req: &Request, db: &Db) -> Result<Option<ApiKey>, Response>
     // --- FREE ACCESS BYPASS ---
     // Extract optional API key if presented (for owner identification)
     let presented = req.headers.get("x-api-key").map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty());
+        .filter(|s| !s.is_empty())
+        // Also accept ?api_key= for browser navigation (e.g. download links
+        // where setting a header is impossible).
+        .or_else(|| {
+            req.query.split('&')
+                .find_map(|p| p.strip_prefix("api_key="))
+                .map(|v| v.to_string())
+        });
 
     let key = match presented {
         Some(raw) => lookup_api_key(db, &raw),

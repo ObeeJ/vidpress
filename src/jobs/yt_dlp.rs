@@ -56,16 +56,20 @@ pub async fn run(
                     let payload = serde_json::to_string(&job_clone.public()).unwrap_or_default();
                     tokio::spawn(async move { webhook::deliver(&url, &payload).await; });
                 }
+                jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
             }
         }
         Ok(o) => {
             tracing::error!("yt-dlp failed: {}", String::from_utf8_lossy(&o.stderr));
             set_status(&jobs, &id, JobStatus::Failed);
-            upsert_job(&db, &jobs.lock().unwrap().get(&id).unwrap().clone());
+            if let Some(j) = jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id) {
+                upsert_job(&db, &j);
+            }
         }
         Err(e) => {
             tracing::error!("yt-dlp spawn failed: {e}");
             set_status(&jobs, &id, JobStatus::Failed);
+            jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
         }
     }
 }

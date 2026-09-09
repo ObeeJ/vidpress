@@ -4,8 +4,8 @@ import PoemFaq from "@/components/PoemFaq";
 import Link from "next/link";
 
 export const metadata = {
-  title: "P.O.E.M & Vision — theflate",
-  description: "Problem, Solution, Strategy — The foundational premise of theflate.",
+  title: "P.O.E.M & Vision | theflate",
+  description: "Problem, Solution, Strategy: The foundational premise of theflate.",
 };
 
 export default function PoemPage() {
@@ -42,7 +42,7 @@ export default function PoemPage() {
             The Fundamental Premise
           </h2>
           <p style={{ fontSize: 14, color: "#a1a1aa", lineHeight: 1.7, marginBottom: 16 }}>
-            Before writing code or designing interfaces, we start with Vision — encapsulated by <strong style={{ color: "#ffffff" }}>P.O.E.M</strong>:
+            Before writing code or designing interfaces, we start with Vision: encapsulated by <strong style={{ color: "#ffffff" }}>P.O.E.M</strong>:
           </p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
             <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 16 }}>

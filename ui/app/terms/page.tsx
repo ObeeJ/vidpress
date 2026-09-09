@@ -2,7 +2,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 export const metadata = {
-  title: "Terms of Service — theflate",
+  title: "Terms of Service | theflate",
   description: "Terms of service, API usage policies, and billing terms for theflate.",
 };
 

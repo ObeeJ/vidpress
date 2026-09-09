@@ -15,10 +15,8 @@ export async function ingestFile(file: File, onProgress?: (pct: number) => void)
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${API}/ingest`);
     xhr.setRequestHeader("x-file-name", file.name);
-    const key = typeof window !== "undefined"
-      ? (window as Window & { __theflate_key?: string }).__theflate_key
-      : undefined;
-    if (key) xhr.setRequestHeader("x-api-key", key);
+    const h = headers();
+    Object.entries(h).forEach(([k, v]) => xhr.setRequestHeader(k, v));
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
     };
@@ -55,12 +53,18 @@ export async function uploadFile(ingestId: string, preset?: string, webhookUrl?:
 }
 
 export function downloadFile(id: string, filename: string) {
-  // Stream directly via navigation — no 2GB blob buffer in a mobile tab,
-  // no revoke race. The server sets content-disposition: attachment. (M12)
+  const key = typeof window !== "undefined"
+    ? (window as Window & { __theflate_key?: string }).__theflate_key
+    : undefined;
+  const url = key
+    ? `${API}/download/${id}?api_key=${encodeURIComponent(key)}`
+    : `${API}/download/${id}`;
   const a = document.createElement("a");
-  a.href = `${API}/download/${id}`;
+  a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
 }
 
 export async function getJob(id: string) {
@@ -75,6 +79,12 @@ export async function transcribeFile(jobId: string) {
     headers: headers({ "content-type": "application/json" }),
     body: JSON.stringify({ job_id: jobId }),
   });
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+export async function getTranscription(id: string) {
+  const r = await fetch(`${API}/transcriptions/${id}`, { headers: headers() });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }

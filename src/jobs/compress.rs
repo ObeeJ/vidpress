@@ -156,6 +156,10 @@ pub async fn run(
                     let payload = serde_json::to_string(&job_clone.public()).unwrap_or_default();
                     tokio::spawn(async move { webhook::deliver(&url, &payload).await; });
                 }
+                // Evict from the in-memory cache — the job is terminal and the
+                // DB is now the source of truth. Without this the HashMap grows
+                // without bound on a busy server. (M6)
+                jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
             }
         }
         _ => {
@@ -163,6 +167,7 @@ pub async fn run(
                 tracing::error!("ffmpeg failed:\n{}", String::from_utf8_lossy(&out.stderr));
             }
             update(JobStatus::Failed, 0, 0, 0);
+            jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
         }
     }
 }

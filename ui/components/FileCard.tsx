@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useStore, FileItem } from "@/lib/store";
-import { ingestFile, analyzeFile, uploadFile, downloadFile, getJob, transcribeFile, exportToDestination, API } from "@/lib/api";
+import { ingestFile, analyzeFile, uploadFile, downloadFile, getJob, transcribeFile, getTranscription, exportToDestination, API } from "@/lib/api";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "@/lib/toast";
 import Button from "@/components/primitives/Button";
@@ -135,7 +135,7 @@ export default function FileCard({ item }: { item: FileItem }) {
   const targetMb = item.targetMb ?? profile?.estimated_output_mb ?? 0;
   const savingPct = originalMb > 0 ? Math.round((1 - targetMb / originalMb) * 100) : 0;
   const downloadTimeSecs = networkMbps > 0 ? Math.ceil((targetMb * 8) / networkMbps) : 0;
-  const costEstimate = targetMb ? `$${(targetMb * 0.01).toFixed(3)}` : "—";
+  const costEstimate = targetMb ? `$${(targetMb * 0.01).toFixed(3)}` : "Free";
   const selectedPreset = item.preset ?? "original";
   const selectedFormat = item.outputFormat ?? profile?.output_ext ?? "";
   const outputUrl = job?.status === "done" ? `${API}/download/${job.id}` : null;
@@ -163,9 +163,19 @@ export default function FileCard({ item }: { item: FileItem }) {
     if (!job?.id) return;
     setTranscribing(true);
     try {
-      const res = await transcribeFile(job.id);
-      setTranscription(res.text);
-      toast("Transcription ready", "success");
+      // Backend is async — returns {transcription_id}, not {text}. Poll until done.
+      const { transcription_id } = await transcribeFile(job.id);
+      for (let i = 0; i < 120; i++) {
+        await new Promise((r) => setTimeout(r, 2000));
+        const result = await getTranscription(transcription_id);
+        if (result.status === "done") {
+          setTranscription(result.text);
+          toast("Transcription ready", "success");
+          return;
+        }
+        if (result.status === "failed") throw new Error("Transcription failed");
+      }
+      throw new Error("Transcription timed out");
     } catch (e) {
       toast(`Transcription failed: ${e}`, "error");
     } finally {

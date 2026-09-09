@@ -46,7 +46,7 @@ export default function LiveStream() {
           const msg = JSON.parse(e.data);
           if (msg.job_id) {
             setJobIdLocal(msg.job_id);
-            toast("Stream captured — ready to download when ended", "info");
+            toast("Stream captured: ready to download when ended", "info");
           }
         } catch {}
       };

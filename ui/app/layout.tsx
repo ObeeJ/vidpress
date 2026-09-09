@@ -30,7 +30,7 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "theflate — compress, convert, transcribe",
+  title: "theflate | Compress, convert, transcribe",
   description:
     "Compress video, audio and images by up to 90% with no visible quality loss. Convert between formats, pull media from a link, and transcribe to text.",
   icons: { icon: "/icon.svg" },
