@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { downloadFile } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import Button from "@/components/primitives/Button";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8081";
 
@@ -96,7 +97,7 @@ export default function LiveStream() {
 
       <div style={{ display: "flex", gap: 10 }}>
         {streamState === "idle" && (
-          <button onClick={startStream} className="vpx-button-primary" style={{ flex: 1 }}>Go Live</button>
+          <Button variant="primary" onClick={startStream} style={{ flex: 1 }}>Go Live</Button>
         )}
         {streamState === "connecting" && (
           <div style={{ flex: 1, padding: "10px", textAlign: "center", fontSize: 13, color: "#a1a1aa" }}>Connecting...</div>
@@ -107,9 +108,9 @@ export default function LiveStream() {
           </button>
         )}
         {streamState === "done" && jobId && (
-          <button onClick={() => downloadFile(jobId, "stream.webm")} className="vpx-button-primary" style={{ flex: 1 }}>
+          <Button variant="primary" onClick={() => downloadFile(jobId, "stream.webm")} style={{ flex: 1 }}>
             Download Recording
-          </button>
+          </Button>
         )}
         {streamState === "done" && !jobId && (
           <div style={{ flex: 1, fontSize: 12, color: "#71717a", padding: "10px" }}>No recording captured.</div>

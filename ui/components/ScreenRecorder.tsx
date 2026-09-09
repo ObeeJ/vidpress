@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { ingestFile, analyzeFile } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import Button from "@/components/primitives/Button";
 
 type RecordState = "idle" | "recording" | "processing";
 
@@ -109,9 +110,9 @@ export default function ScreenRecorder() {
 
       <div style={{ display: "flex", gap: 10 }}>
         {state === "idle" && (
-          <button onClick={startRecording} className="vpx-button-primary" style={{ flex: 1 }}>
+          <Button variant="primary" onClick={startRecording} style={{ flex: 1 }}>
             Start Recording
-          </button>
+          </Button>
         )}
         {state === "recording" && (
           <button onClick={stopRecording} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #ef4444", background: "#ef444422", color: "#ef4444", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { API, downloadFile } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import Button from "@/components/primitives/Button";
 
 export default function UrlDownloader() {
   const [url, setUrl] = useState("");
@@ -59,14 +60,14 @@ export default function UrlDownloader() {
           placeholder="https://youtu.be/... or https://x.com/..."
           style={{ flex: 1, padding: "10px 14px", borderRadius: 9999, border: "1px solid #27272a", background: "#000000", color: "#ffffff", fontSize: 13, outline: "none" }}
         />
-        <button
+        <Button
+          variant="primary"
           onClick={submit}
           disabled={loading || !url.trim()}
-          className="vpx-button-primary"
-          style={{ opacity: loading || !url.trim() ? 0.5 : 1, padding: "8px 18px", whiteSpace: "nowrap" }}
+          style={{ padding: "8px 18px", whiteSpace: "nowrap" }}
         >
           {loading ? "Fetching..." : audioOnly ? "Extract Audio" : "Fetch Media"}
-        </button>
+        </Button>
       </div>
 
       <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#a1a1aa", cursor: "pointer", userSelect: "none" }}>
@@ -95,13 +96,13 @@ export default function UrlDownloader() {
               <video src={`${API}/download/${jobId}`} controls playsInline crossOrigin="anonymous" style={{ width: "100%", maxHeight: 320, display: "block" }} />
             )}
           </div>
-          <button
+          <Button
+            variant="primary"
             onClick={() => downloadFile(jobId, audioOnly ? "audio.mp3" : "video.mp4")}
-            className="vpx-button-primary"
             style={{ width: "100%" }}
           >
             Download {audioOnly ? "MP3" : "MP4"}
-          </button>
+          </Button>
         </div>
       )}
 

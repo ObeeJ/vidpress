@@ -5,6 +5,7 @@ import { useStore, FileItem } from "@/lib/store";
 import { ingestFile, analyzeFile, uploadFile, downloadFile, getJob, transcribeFile, exportToDestination, API } from "@/lib/api";
 import { QRCodeSVG } from "qrcode.react";
 import { toast } from "@/lib/toast";
+import Button from "@/components/primitives/Button";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 
@@ -341,9 +342,9 @@ export default function FileCard({ item }: { item: FileItem }) {
 
         {/* Theflate Button */}
         {profile && !job && (
-          <button onClick={theflate} className="vpx-button-primary" style={{ width: "100%", padding: "10px" }}>
+          <Button variant="primary" onClick={theflate} style={{ width: "100%", padding: "10px" }}>
             Theflate →
-          </button>
+          </Button>
         )}
 
         {/* Processing State */}
@@ -398,9 +399,9 @@ export default function FileCard({ item }: { item: FileItem }) {
               <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>Transcribe</div>
-                  <button onClick={runTranscription} disabled={transcribing} className="vpx-button-secondary" style={{ fontSize: 11, padding: "4px 12px" }}>
+                  <Button variant="secondary" size="sm" onClick={runTranscription} disabled={transcribing}>
                     {transcribing ? "Transcribing..." : transcription ? "Redo" : "Generate"}
-                  </button>
+                  </Button>
                 </div>
                 {transcription && (
                   <div style={{ background: "#000000", border: "1px solid #18181b", borderRadius: 6, padding: 12, fontSize: 12, color: "#a1a1aa", maxHeight: 120, overflowY: "auto", whiteSpace: "pre-wrap" }}>
@@ -417,9 +418,9 @@ export default function FileCard({ item }: { item: FileItem }) {
                   <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>Export to Cloud Storage</div>
                   <div style={{ fontSize: 11, color: "#71717a" }}>Send your file to AWS S3, Cloudflare R2, Supabase, Google Drive, or Dropbox</div>
                 </div>
-                <button onClick={() => setShowExport(!showExport)} className="vpx-button-secondary" style={{ fontSize: 11, padding: "4px 12px" }}>
+                <Button variant="secondary" size="sm" onClick={() => setShowExport(!showExport)}>
                   {showExport ? "Hide Target" : "Configure Destination"}
-                </button>
+                </Button>
               </div>
               {showExport && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 4 }}>
@@ -446,9 +447,9 @@ export default function FileCard({ item }: { item: FileItem }) {
                       placeholder={DESTINATIONS.find((d) => d.id === exportProvider)?.placeholder ?? "target-name"}
                       style={{ flex: 1, padding: "8px 12px", borderRadius: 6, background: "#000000", border: "1px solid #27272a", color: "#ffffff", fontSize: 12, outline: "none" }}
                     />
-                    <button onClick={handleDestinationExport} disabled={exporting} className="vpx-button-primary" style={{ fontSize: 12, padding: "6px 14px", whiteSpace: "nowrap" }}>
+                    <Button variant="primary" size="sm" onClick={handleDestinationExport} disabled={exporting}>
                       {exporting ? "Exporting..." : "Send File"}
-                    </button>
+                    </Button>
                   </div>
                   {exportedUrl && (
                     <div style={{ fontSize: 11, color: "#10b981", background: "#10b98111", border: "1px solid #10b98133", padding: "8px 12px", borderRadius: 6, wordBreak: "break-all" }}>
@@ -461,17 +462,17 @@ export default function FileCard({ item }: { item: FileItem }) {
 
             {/* Actions */}
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setShowQrModal(!showQrModal)} className="vpx-button-secondary" style={{ flex: 1 }}>
+              <Button variant="secondary" onClick={() => setShowQrModal(!showQrModal)} style={{ flex: 1 }}>
                 {showQrModal ? "Hide QR Code" : "QR Share"}
-              </button>
+              </Button>
               {outputUrl && (
-                <button
+                <Button
+                  variant="primary"
                   onClick={() => downloadFile(job!.id, `theflated_${item.file.name}`)}
-                  className="vpx-button-primary"
                   style={{ flex: 1 }}
                 >
                   Download
-                </button>
+                </Button>
               )}
             </div>
 
