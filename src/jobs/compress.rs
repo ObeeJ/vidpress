@@ -37,9 +37,12 @@ pub async fn run(
 
     update(JobStatus::Processing, 0, profile.estimated_time_secs, 0);
 
-    let progress_file = format!("/tmp/{id}_progress");
+    let progress_file = format!("{}/{id}_progress", crate::state::storage_dir());
     let duration = profile.duration_secs;
     let ffmpeg_args = if let Some(mb) = target_mb.filter(|_| preset.is_none()) {
+        // Cap target_mb to prevent absurd bitrates that fill the disk. (M11)
+        const MAX_TARGET_MB: f64 = 10_240.0;
+        let mb = mb.clamp(0.1, MAX_TARGET_MB);
         // Convert target MB to a video bitrate, reserving 128k for audio
         let total_kbps = ((mb * 8.0 * 1024.0) / profile.duration_secs.max(1.0)) as u64;
         let video_kbps = total_kbps.saturating_sub(128).max(100);

@@ -14,7 +14,8 @@ pub async fn run(
     set_status(&jobs, &id, JobStatus::Processing);
     upsert_job(&db, &jobs.lock().unwrap().get(&id).unwrap().clone());
 
-    let mut args = vec!["--no-playlist".to_string(), "-o".to_string(), output.clone()];
+    let mut args = vec!["--no-playlist".to_string(), "-o".to_string(), output.clone(),
+        "--max-filesize".to_string(), "4G".to_string()];
     if audio_only {
         args.extend(["--extract-audio".into(), "--audio-format".into(), "mp3".into(), "--audio-quality".into(), "0".into()]);
     } else {
