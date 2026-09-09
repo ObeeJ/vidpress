@@ -1,140 +1,429 @@
 @import "tailwindcss";
 
-:root {
-  --bg: #000000;
-  --surface: #09090b;
-  --surface-hover: #121215;
-  --surface-active: #18181b;
-  --border: #27272a;
-  --border-strong: #3f3f46;
-  --text: #f4f4f5;
-  --text-muted: #a1a1aa;
-  --text-subtle: #71717a;
-  --accent: #ffffff;
-  --accent-text: #000000;
-  --status-green: #10b981;
-  --status-red: #ef4444;
+/* ============================================================================
+   theflate — design foundation
+   Direction: "precision instrument". The product measures a file and makes it
+   smaller. The interface should read like calibrated equipment, not a landing
+   page: one signal colour against warm ink, monospace for every number, and
+   motion that contracts rather than floats.
+
+   Everything below is a token. Components should reference tokens, never
+   literals — that is the difference between a system and 345 inline styles.
+   ========================================================================== */
+
+@theme {
+  /* --- ground -------------------------------------------------------------
+     Deliberately NOT #000. Pure black is the default nobody chose, it smears
+     on OLED during scroll, and it forces every border to be a grey step. A
+     near-black with a faint warm cast reads as an intentional surface. */
+  --color-ink:        #0C0C0E;
+  --color-surface:    #131316;
+  --color-surface-2:  #1A1A1E;
+  --color-surface-3:  #222228;
+  --color-line:       #2A2A31;
+  --color-line-lit:   #3A3A44;
+
+  /* --- text: three steps, no more ---------------------------------------- */
+  --color-fg:         #ECECEF;
+  --color-fg-2:       #9C9CA6;
+  --color-fg-3:       #6A6A75;
+
+  /* --- signal -------------------------------------------------------------
+     ONE accent, used only where a number or a state changes. Acid lime on ink
+     is instrument-readout language (VU meters, spectrum analysers) and is the
+     opposite of the purple-gradient default. Restraint is the whole point:
+     if everything is signal, nothing is. */
+  --color-signal:     #C9F24E;
+  --color-signal-dim: #8FAE33;
+  --color-on-signal:  #0C0C0E;
+
+  --color-warn:       #F2A93B;
+  --color-danger:     #FF5A47;
+
+  /* --- type ---------------------------------------------------------------
+     Families are injected by next/font in app/layout.tsx as CSS variables.
+     Archivo: industrial grotesque, real character, variable weight.
+     JetBrains Mono: every numeral — sizes, percentages, ETAs, IDs. Numbers
+     are this product's content, so they get their own voice and tabular
+     figures so they stop jittering as they count. */
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SF Mono", monospace;
+
+  /* Modular scale, 1.25 ratio, anchored at 16px. Root stays 16px so browser
+     font-size preferences and rem-based spacing keep working — the previous
+     `font-size: 14px` on <html> silently broke both. */
+  --text-2xs:  0.6875rem;  /* 11px — mono labels only */
+  --text-xs:   0.75rem;    /* 12px */
+  --text-sm:   0.875rem;   /* 14px */
+  --text-base: 1rem;       /* 16px */
+  --text-lg:   1.25rem;    /* 20px */
+  --text-xl:   1.5rem;     /* 24px */
+  --text-2xl:  2rem;       /* 32px */
+  --text-3xl:  2.75rem;    /* 44px */
+  --text-4xl:  3.5rem;     /* 56px */
+
+  /* --- space: 4px base, no arbitrary values ------------------------------ */
+  --spacing-1:  0.25rem;
+  --spacing-2:  0.5rem;
+  --spacing-3:  0.75rem;
+  --spacing-4:  1rem;
+  --spacing-5:  1.25rem;
+  --spacing-6:  1.5rem;
+  --spacing-8:  2rem;
+  --spacing-12: 3rem;
+  --spacing-16: 4rem;
+  --spacing-24: 6rem;
+
+  /* --- radius: three values, chosen once --------------------------------- */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-full: 9999px;
+
+  /* --- one measure, shared by nav and content ---------------------------- */
+  --measure: 62rem;
+
+  /* --- motion -------------------------------------------------------------
+     One easing family, four durations. Every transition in the app picks from
+     this list; nothing invents its own timing. `--ease-out` is an expo curve —
+     it leaves fast and settles slowly, which reads as "responsive" rather than
+     "animated". */
+  --ease-out:    cubic-bezier(0.16, 1, 0.30, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-snap:   cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  --dur-1: 120ms;  /* state flips: hover, focus, active */
+  --dur-2: 200ms;  /* element enters and exits */
+  --dur-3: 320ms;  /* composed reveals */
+  --dur-4: 560ms;  /* the one hero moment: contraction */
 }
 
-* {
+/* ---------------------------------------------------------------------------
+   base
+   ------------------------------------------------------------------------ */
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
 }
 
-html, body {
-  background-color: var(--bg);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
+html {
+  /* 16px root. Do not set a px font-size here again — it breaks rem scaling
+     and overrides the user's browser font-size preference (WCAG 1.4.4). */
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  letter-spacing: -0.006em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
+
+/* Numerals never reflow mid-count. Applies to any element showing a measured
+   value — file sizes, percentages, ETAs, bitrates. */
+.tabular,
+[data-numeric] {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+/* Uppercase mono micro-labels: "ORIGINAL", "STEP 02", "QUEUED". The chrome of
+   an instrument. */
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-fg-3);
+}
+
+h1, h2, h3 {
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+p { text-wrap: pretty; }
 
 ::selection {
-  background: #27272a;
-  color: #ffffff;
+  background: var(--color-signal);
+  color: var(--color-on-signal);
 }
 
-/* Custom crisp scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+/* ---------------------------------------------------------------------------
+   focus — the single largest accessibility gap in the current UI.
+   Not one interactive element had a visible focus style. This gives every
+   focusable thing one, for free, and only for keyboard users.
+   ------------------------------------------------------------------------ */
+
+:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
-::-webkit-scrollbar-track {
-  background: #000000;
-}
+
+:focus:not(:focus-visible) { outline: none; }
+
+/* ---------------------------------------------------------------------------
+   scrollbar
+   ------------------------------------------------------------------------ */
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--color-ink); }
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 3px;
+  background: var(--color-line);
+  border: 3px solid var(--color-ink);
+  border-radius: var(--radius-full);
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+::-webkit-scrollbar-thumb:hover { background: var(--color-line-lit); }
+
+/* ---------------------------------------------------------------------------
+   motion primitives
+
+   Two ideas, and only two:
+     1. `reveal`   — entrance. Rises 6px and settles. Stagger with --i.
+     2. `contract` — the signature. Things arrive by *tightening*, which is
+                     what the product does to files. This is the one gesture
+                     worth remembering, so it is spent sparingly: the result
+                     number, and nothing else.
+   ------------------------------------------------------------------------ */
+
+@keyframes reveal {
+  from { opacity: 0; transform: translate3d(0, 6px, 0); }
+  to   { opacity: 1; transform: none; }
 }
 
-/* Micro-animations */
-@keyframes vpx-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
+@keyframes contract {
+  0%   { opacity: 0; transform: scale(1.06); letter-spacing: 0.04em; }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: scale(1);    letter-spacing: -0.01em; }
 }
 
-@keyframes vpx-scan {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+/* A single sweep of light along a track. Used for indeterminate work only —
+   never as decoration. */
+@keyframes sweep {
+  from { transform: translate3d(-100%, 0, 0); }
+  to   { transform: translate3d(300%, 0, 0); }
 }
 
-.animate-vpx-pulse {
-  animation: vpx-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+@keyframes breathe {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 1; }
+}
+
+.reveal {
+  animation: reveal var(--dur-3) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+
+.contract  { animation: contract var(--dur-4) var(--ease-snap) both; }
+.breathing { animation: breathe 1.8s var(--ease-in-out) infinite; }
+
+/* Indeterminate track: a lit sliver travelling a rail. Transform-only, so it
+   composites on the GPU and never triggers layout. */
+.track {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface-2);
+  border-radius: var(--radius-full);
+}
+.track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 33%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--color-signal), transparent);
+  animation: sweep 1.4s var(--ease-in-out) infinite;
+  will-change: transform;
+}
+
+/* ---------------------------------------------------------------------------
+   reduced motion — WCAG 2.3.3.
+   The current build has three infinite animations (two SMIL, one CSS) that
+   run forever regardless of this setting. Everything decorative stops here;
+   anything that communicates progress degrades to a static state rather than
+   disappearing.
+   ------------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .track::after {
+    animation: none;
+    width: 100%;
+    background: var(--color-signal-dim);
+    opacity: 0.5;
+  }
+
+  .breathing { animation: none; opacity: 1; }
+}
+
+/* ---------------------------------------------------------------------------
+   controls
+
+   `.vpx-*` names are kept verbatim because 12 call sites across FileCard,
+   LiveStream, ScreenRecorder, UrlDownloader and poem/page still reference
+   them. They now resolve to the token system instead of hardcoded hex, so the
+   rename to `.btn-*` can happen later as a pure find-and-replace with no
+   visual change.
+   ------------------------------------------------------------------------ */
+
+.btn,
+.vpx-button-primary,
+.vpx-button-secondary {
+  --btn-bg: var(--color-surface-2);
+  --btn-fg: var(--color-fg);
+  --btn-line: var(--color-line);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-2);
+
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  white-space: nowrap;
+
+  padding: 0.625rem 1rem;
+  border: 1px solid var(--btn-line);
+  border-radius: var(--radius-md);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+
+  cursor: pointer;
+  text-decoration: none;
+  user-select: none;
+
+  /* Named properties only. `transition: all` animates layout properties too,
+     which is how you get jank you cannot find. */
+  transition:
+    background-color var(--dur-1) var(--ease-out),
+    border-color     var(--dur-1) var(--ease-out),
+    color            var(--dur-1) var(--ease-out),
+    transform        var(--dur-1) var(--ease-out),
+    opacity          var(--dur-1) var(--ease-out);
 }
 
 .vpx-button-primary {
-  background: #ffffff;
-  color: #000000;
-  font-weight: 600;
-  border: 1px solid #ffffff;
-  border-radius: 9999px;
-  padding: 8px 18px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.05s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  text-decoration: none;
-}
-.vpx-button-primary:hover {
-  background: #e4e4e7;
-  border-color: #e4e4e7;
-}
-.vpx-button-primary:active {
-  transform: scale(0.98);
+  --btn-bg: var(--color-signal);
+  --btn-fg: var(--color-on-signal);
+  --btn-line: var(--color-signal);
+  font-weight: 650;
 }
 
-.vpx-button-secondary {
-  background: #09090b;
-  color: #f4f4f5;
-  font-weight: 500;
-  border: 1px solid #27272a;
-  border-radius: 9999px;
-  padding: 8px 18px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.05s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  text-decoration: none;
-}
+.btn:hover,
 .vpx-button-secondary:hover {
-  background: #18181b;
-  border-color: #3f3f46;
+  background: var(--color-surface-3);
+  border-color: var(--color-line-lit);
 }
+
+.vpx-button-primary:hover {
+  background: #D6FF62;
+  border-color: #D6FF62;
+}
+
+/* 1px, not a scale transform — the press should feel like a key travelling,
+   and it must not blur text on the way down. */
+.btn:active,
+.vpx-button-primary:active,
 .vpx-button-secondary:active {
-  transform: scale(0.98);
+  transform: translate3d(0, 1px, 0);
 }
 
+.btn:disabled,
+.vpx-button-primary:disabled,
+.vpx-button-secondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ---------------------------------------------------------------------------
+   surfaces
+   ------------------------------------------------------------------------ */
+
+.card,
 .vpx-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-lg);
 }
 
-/* Skeleton Loader */
-.vpx-skeleton {
-  background: linear-gradient(90deg, #18181b 25%, #27272a 50%, #18181b 75%);
+.vpx-skeleton,
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    var(--color-surface-3) 50%,
+    var(--color-surface-2) 75%
+  );
   background-size: 200% 100%;
-  animation: vpx-skeleton-loading 1.5s infinite;
+  animation: skeleton 1.4s linear infinite;
+  border-radius: var(--radius-sm);
 }
 
-@keyframes vpx-skeleton-loading {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+@keyframes skeleton {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
 }
 
-@keyframes theflate-pulse {
-  0%, 100% { opacity: 0.2; }
-  50% { opacity: 1; }
+/* Legacy alias — `.animate-vpx-pulse` is referenced by existing components. */
+.animate-vpx-pulse { animation: breathe 1.8s var(--ease-in-out) infinite; }
+
+/* ---------------------------------------------------------------------------
+   layout helper — one measure, so the nav and the content actually align.
+   They currently do not: Navbar uses maxWidth 1100, page.tsx uses 900.
+   ------------------------------------------------------------------------ */
+
+.measure {
+  width: 100%;
+  max-width: var(--measure);
+  margin-inline: auto;
+  padding-inline: var(--spacing-5);
+}
+
+/* ---------------------------------------------------------------------------
+   responsive type — the hero is currently a fixed 46px, which overflows at
+   375px. Clamp is the whole fix and needs no breakpoints.
+   ------------------------------------------------------------------------ */
+
+.display {
+  font-size: clamp(2rem, 1.2rem + 4vw, 3.5rem);
+  font-weight: 620;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+}
+
+.lede {
+  font-size: clamp(0.9375rem, 0.9rem + 0.35vw, 1.0625rem);
+  color: var(--color-fg-2);
+  line-height: 1.6;
+  max-width: 46ch;
 }

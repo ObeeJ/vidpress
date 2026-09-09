@@ -71,7 +71,7 @@ pub async fn finish_session(
         output_path: session.output.clone(),
         original_bytes: size, compressed_bytes: size,
         duration_secs: 0.0, progress: 100, eta_secs: 0,
-        webhook_url: None, preset: None, destination: None, remote_url: None,
+        webhook_url: None, preset: None, destination: None, remote_url: None, owner_key: None,
     };
     upsert_job(db, &job);
     jobs.lock().unwrap().insert(id, job);

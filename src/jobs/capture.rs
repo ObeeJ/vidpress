@@ -51,7 +51,7 @@ pub async fn start(
         output_path: output,
         original_bytes: 0, compressed_bytes: 0,
         duration_secs: 0.0, progress: 0, eta_secs: 0,
-        webhook_url: None, preset: None, destination: None, remote_url: None,
+        webhook_url: None, preset: None, destination: None, remote_url: None, owner_key: None,
     };
     upsert_job(db, &job);
     jobs.lock().unwrap().insert(id.clone(), job);

@@ -57,7 +57,7 @@ pub async fn download_url(req: Request) -> Response {
         media_kind: if audio_only { MediaKind::AudioLossy } else { MediaKind::Video },
         input_path: url.clone(), output_path: output_path.clone(),
         original_bytes: 0, compressed_bytes: 0, duration_secs: 0.0,
-        progress: 0, eta_secs: 60, webhook_url, preset: None, destination, remote_url: None,
+        progress: 0, eta_secs: 60, webhook_url, preset: None, destination, remote_url: None, owner_key: None,
     };
     upsert_job(&state.db, &job);
     state.jobs.lock().unwrap().insert(id.clone(), job);

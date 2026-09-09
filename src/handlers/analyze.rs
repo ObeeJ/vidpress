@@ -5,17 +5,32 @@ use crate::{auth::auth_and_rate, media::detect::detect, state::AppState};
 #[post("/analyze")]
 pub async fn analyze(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
-    if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
-    let path = match extract_path(&req) { Ok(p) => p, Err(r) => return r };
+    let caller = match auth_and_rate(&req, &state.db) { Ok(c) => c, Err(r) => return r };
+
+    let body: serde_json::Value = match serde_json::from_slice(&req.body) {
+        Ok(v) => v,
+        Err(_) => return json_err(400, "expected JSON body"),
+    };
+    let ingest_id = match body["ingest_id"].as_str() {
+        Some(s) => s,
+        None => return json_err(400, "missing ingest_id"),
+    };
+    let path = match crate::ingest_store::resolve(
+        &state.db, ingest_id, caller.as_ref().map(|k| k.key.as_str())
+    ) {
+        Some(p) => p,
+        None => return json_err(404, "unknown or expired ingest_id"),
+    };
+
     match detect(&path).await {
         Ok(p)  => Response { status: 200, body: serde_json::to_string(&p).unwrap().into(), ..Default::default() },
-        Err(e) => Response { status: 415, body: format!(r#"{{"error":"{e}"}}"#).into(), ..Default::default() },
+        Err(_) => json_err(415, "unsupported media type"),
     }
 }
 
-pub fn extract_path(req: &Request) -> Result<String, Response> {
-    let body: serde_json::Value = serde_json::from_slice(&req.body)
-        .map_err(|_| Response { status: 400, body: r#"{"error":"expected JSON with 'path' field"}"#.into(), ..Default::default() })?;
-    body["path"].as_str().map(String::from)
-        .ok_or_else(|| Response { status: 400, body: r#"{"error":"missing 'path' field"}"#.into(), ..Default::default() })
+/// Build a correctly-escaped JSON error. Never interpolate an error string
+/// into a format! literal — ffprobe messages contain quotes and produce
+/// invalid JSON that the frontend's r.json() throws on. (M1)
+pub fn json_err(status: u16, msg: &str) -> Response {
+    Response { status, body: serde_json::json!({ "error": msg }).to_string().into(), ..Default::default() }
 }

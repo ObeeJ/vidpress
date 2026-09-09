@@ -6,20 +6,22 @@
 //! the production schema in `db::init_db`, so schema drift breaks these tests.
 //!
 //! These live in `src/` rather than `tests/` because the crate has no `[lib]`
-//! target - a binary-only crate exports nothing for integration tests to
+//! target — a binary-only crate exports nothing for integration tests to
 //! import. Adding `src/lib.rs` would let these move to `tests/`.
+
+#![cfg(test)]
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use rusqlite::Connection;
 
-use theflate::auth::rate_limit_for;
-use theflate::db::{get_job, init_db, upsert_job};
-use theflate::jobs::model::{DestinationConfig, Job, JobStatus};
-use theflate::media::detect::MediaKind;
-use theflate::media::path_guard::{resolve_input, resolve_output_ext, PathError};
-use theflate::state::Db;
+use crate::auth::rate_limit_for;
+use crate::db::{get_job, init_db, upsert_job};
+use crate::jobs::model::{DestinationConfig, Job, JobStatus};
+use crate::media::detect::MediaKind;
+use crate::media::path_guard::{resolve_input, resolve_output_ext, PathError};
+use crate::state::Db;
 
 // ---------------------------------------------------------------- test rig --
 
@@ -55,7 +57,7 @@ fn queued_job(id: &str) -> Job {
     }
 }
 
-/// Stands in for `jobs::compress::run` - same state transitions, no subprocess.
+/// Stands in for `jobs::compress::run` — same state transitions, no subprocess.
 fn mock_encode(db: &Db, jobs: &Arc<Mutex<HashMap<String, Job>>>, id: &str, ticks: &[u8]) {
     {
         let mut store = jobs.lock().unwrap();
@@ -117,7 +119,7 @@ fn full_lifecycle_queued_to_done_persists_every_transition() {
 
 #[test]
 fn download_is_refused_until_the_job_is_done() {
-    // Mirrors the guard at handlers/jobs.rs:26 - only `Done` may be served.
+    // Mirrors the guard at handlers/jobs.rs:26 — only `Done` may be served.
     let db = mock_db();
     let jobs = mock_jobs();
     let id = "job-mock-2";
@@ -146,7 +148,7 @@ fn unknown_job_id_is_absent_rather_than_defaulted() {
 #[test]
 fn regression_public_job_never_carries_destination_credentials() {
     // Guards the leak at handlers/jobs.rs:13, where `GET /jobs/:id` serialised
-    // the full `Job` - including S3 secrets - to any caller holding a job id.
+    // the full `Job` — including S3 secrets — to any caller holding a job id.
     let db = mock_db();
     let id = "job-mock-3";
     let mut job = queued_job(id);

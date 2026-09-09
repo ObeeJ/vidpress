@@ -7,7 +7,7 @@
 pub mod auth;
 pub mod db;
 pub mod handlers;
-// pub mod ingest_store;   // uncommented in Task 1.2
+pub mod ingest_store;
 pub mod jobs;
 pub mod media;
 pub mod state;
