@@ -66,6 +66,7 @@ pub fn init_db(conn: &Connection) {
         "ALTER TABLE jobs ADD COLUMN destination_json TEXT",
         "ALTER TABLE jobs ADD COLUMN remote_url TEXT",
         "ALTER TABLE jobs ADD COLUMN owner_key TEXT",
+        "ALTER TABLE transcriptions ADD COLUMN status TEXT",
     ];
     for stmt in MIGRATIONS {
         match conn.execute(stmt, []) {
