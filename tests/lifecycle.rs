@@ -241,7 +241,6 @@ fn regression_rate_limits_are_finite_for_every_plan() {
 /// the attribute when `upsert_job` is fixed to preserve `created_at`; the test
 /// should then pass unchanged.
 #[test]
-#[ignore = "known defect: upsert_job resets created_at on every update"]
 fn created_at_survives_progress_updates() {
     let db = mock_db();
     let jobs = mock_jobs();
