@@ -70,7 +70,7 @@ const stat = (label: string, value: string, color?: string) => (
 
 export default function FileCard({ item }: { item: FileItem }) {
   const { setProfile, setJobId, setJob, setError, removeFile, networkMbps } = useStore();
-  const setServerPath = useStore((s) => s.setServerPath);
+  const setIngestId = useStore((s) => s.setIngestId);
   const setUploadPct = useStore((s) => s.setUploadPct);
   const setTargetMb = useStore((s) => s.setTargetMb);
   const setPreset = useStore((s) => s.setPreset);
@@ -90,18 +90,18 @@ export default function FileCard({ item }: { item: FileItem }) {
 
   // Ingest & analyze on mount
   useEffect(() => {
-    if (item.profile || item.error || item.serverPath) return;
+    if (item.profile || item.error || item.ingestId) return;
     ingestFile(item.file, (pct) => setUploadPct(item.localUrl, pct))
-      .then((path) => {
-        setServerPath(item.localUrl, path);
-        return analyzeFile(path);
+      .then((ingestId) => {
+        setIngestId(item.localUrl, ingestId);
+        return analyzeFile(ingestId);
       })
       .then((p) => setProfile(item.localUrl, p))
       .catch((e) => {
         setError(item.localUrl, `Upload failed: ${e}`);
         toast(`Upload failed: ${e}`, "error");
       });
-  }, [item.file, item.localUrl, item.profile, item.error, item.serverPath, setUploadPct, setServerPath, setProfile, setError]);
+  }, [item.file, item.localUrl, item.profile, item.error, item.ingestId, setUploadPct, setIngestId, setProfile, setError]);
 
   // Poll job status
   useEffect(() => {
@@ -140,10 +140,10 @@ export default function FileCard({ item }: { item: FileItem }) {
   const shareUrl = job?.status === "done" ? `${BASE_URL}/download/${job.id}` : null;
 
   async function theflate() {
-    if (!item.serverPath) return;
+    if (!item.ingestId) return;
     try {
       const { job_id } = await uploadFile(
-        item.serverPath,
+        item.ingestId,
         selectedPreset === "original" ? undefined : selectedPreset,
         undefined,
         selectedFormat !== profile?.output_ext ? selectedFormat : undefined,
@@ -236,15 +236,15 @@ export default function FileCard({ item }: { item: FileItem }) {
         {!profile && !item.error && (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a1a1aa" }}>
-              <span>{item.serverPath ? "Inspecting file..." : "Uploading..."}</span>
-              {!item.serverPath && <span>{item.uploadPct ?? 0}%</span>}
+              <span>{item.ingestId ? "Inspecting file..." : "Uploading..."}</span>
+              {!item.ingestId && <span>{item.uploadPct ?? 0}%</span>}
             </div>
             <div style={{ height: 4, background: "#18181b", borderRadius: 99, overflow: "hidden" }}>
               <div
                 style={{
                   height: "100%",
-                  width: item.serverPath ? "100%" : `${item.uploadPct ?? 0}%`,
-                  background: item.serverPath ? "#10b981" : "#ffffff",
+                  width: item.ingestId ? "100%" : `${item.uploadPct ?? 0}%`,
+                  background: item.ingestId ? "#10b981" : "#ffffff",
                   borderRadius: 99,
                   transition: "width 0.3s ease",
                 }}

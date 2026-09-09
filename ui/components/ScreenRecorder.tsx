@@ -8,7 +8,7 @@ import { toast } from "@/lib/toast";
 type RecordState = "idle" | "recording" | "processing";
 
 export default function ScreenRecorder() {
-  const { addFileWithUrl, setServerPath, setProfile, setError } = useStore();
+  const { addFileWithUrl, setIngestId, setProfile, setError } = useStore();
   const [state, setState] = useState<RecordState>("idle");
   const [elapsed, setElapsed] = useState(0);
   const mediaRef = useRef<MediaRecorder | null>(null);
@@ -73,9 +73,9 @@ export default function ScreenRecorder() {
     const localUrl = URL.createObjectURL(file);
     addFileWithUrl(file, localUrl);
     try {
-      const path = await ingestFile(file);
-      setServerPath(localUrl, path);
-      const profile = await analyzeFile(path);
+      const ingestId = await ingestFile(file);
+      setIngestId(localUrl, ingestId);
+      const profile = await analyzeFile(ingestId);
       setProfile(localUrl, profile);
       toast("Screen recording ready to theflate", "success");
     } catch (e) {

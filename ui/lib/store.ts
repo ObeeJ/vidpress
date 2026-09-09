@@ -6,19 +6,20 @@ export interface Job {
   id: string;
   status: JobStatus;
   media_kind: string;
-  input_path: string;
-  output_path: string;
   original_bytes: number;
   compressed_bytes: number;
   duration_secs: number;
   progress: number;
   eta_secs: number;
+  preset?: string;
+  remote_url?: string;
+  has_destination?: boolean;
 }
 
 export interface FileItem {
   file: File;
   localUrl: string;
-  serverPath?: string;
+  ingestId?: string;
   jobId?: string;
   job?: Job;
   profile?: MediaProfile;
@@ -26,7 +27,7 @@ export interface FileItem {
   error?: string;
   uploadPct?: number;
   preset?: string;
-  outputFormat?: string; // user-selected output format
+  outputFormat?: string;
 }
 
 export interface MediaProfile {
@@ -47,7 +48,7 @@ interface Store {
   networkMbps: number;
   addFiles: (files: File[]) => void;
   setProfile: (localUrl: string, profile: MediaProfile) => void;
-  setServerPath: (localUrl: string, serverPath: string) => void;
+  setIngestId: (localUrl: string, ingestId: string) => void;
   setUploadPct: (localUrl: string, pct: number) => void;
   setJobId: (localUrl: string, jobId: string) => void;
   setJob: (localUrl: string, job: Job) => void;
@@ -74,9 +75,9 @@ export const useStore = create<Store>((set) => ({
     set((s) => ({
       files: s.files.map((f) => (f.localUrl === localUrl ? { ...f, profile, targetMb: profile.estimated_output_mb, outputFormat: profile.output_ext } : f)),
     })),
-  setServerPath: (localUrl, serverPath) =>
+  setIngestId: (localUrl, ingestId) =>
     set((s) => ({
-      files: s.files.map((f) => (f.localUrl === localUrl ? { ...f, serverPath } : f)),
+      files: s.files.map((f) => (f.localUrl === localUrl ? { ...f, ingestId } : f)),
     })),
   setUploadPct: (localUrl, uploadPct) =>
     set((s) => ({

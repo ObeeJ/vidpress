@@ -1,16 +1,30 @@
 export const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
 
+function headers(extra?: Record<string, string>): Record<string, string> {
+  const key = typeof window !== "undefined"
+    ? (window as Window & { __theflate_key?: string }).__theflate_key
+    : undefined;
+  return {
+    ...(key ? { "x-api-key": key } : {}),
+    ...extra,
+  };
+}
+
 export async function ingestFile(file: File, onProgress?: (pct: number) => void): Promise<string> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${API}/ingest`);
     xhr.setRequestHeader("x-file-name", file.name);
+    const key = typeof window !== "undefined"
+      ? (window as Window & { __theflate_key?: string }).__theflate_key
+      : undefined;
+    if (key) xhr.setRequestHeader("x-api-key", key);
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(JSON.parse(xhr.responseText).path);
+        resolve(JSON.parse(xhr.responseText).ingest_id);
       } else {
         reject(new Error(xhr.responseText));
       }
@@ -20,40 +34,37 @@ export async function ingestFile(file: File, onProgress?: (pct: number) => void)
   });
 }
 
-export async function analyzeFile(path: string) {
+export async function analyzeFile(ingestId: string) {
   const r = await fetch(`${API}/analyze`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ path }),
+    headers: headers({ "content-type": "application/json" }),
+    body: JSON.stringify({ ingest_id: ingestId }),
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
-export async function uploadFile(path: string, preset?: string, webhookUrl?: string, outputFormat?: string, targetMb?: number) {
+export async function uploadFile(ingestId: string, preset?: string, webhookUrl?: string, outputFormat?: string, targetMb?: number) {
   const r = await fetch(`${API}/upload`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ path, preset, webhook_url: webhookUrl, output_format: outputFormat, target_mb: targetMb }),
+    headers: headers({ "content-type": "application/json" }),
+    body: JSON.stringify({ ingest_id: ingestId, preset, webhook_url: webhookUrl, output_format: outputFormat, target_mb: targetMb }),
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
 
-export async function downloadFile(id: string, filename: string) {
-  const r = await fetch(`${API}/download/${id}`);
-  if (!r.ok) throw new Error("Download failed");
-  const blob = await r.blob();
-  const url = URL.createObjectURL(blob);
+export function downloadFile(id: string, filename: string) {
+  // Stream directly via navigation — no 2GB blob buffer in a mobile tab,
+  // no revoke race. The server sets content-disposition: attachment. (M12)
   const a = document.createElement("a");
-  a.href = url;
+  a.href = `${API}/download/${id}`;
   a.download = filename;
   a.click();
-  URL.revokeObjectURL(url);
 }
 
 export async function getJob(id: string) {
-  const r = await fetch(`${API}/jobs/${id}`);
+  const r = await fetch(`${API}/jobs/${id}`, { headers: headers() });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
@@ -61,7 +72,7 @@ export async function getJob(id: string) {
 export async function transcribeFile(jobId: string) {
   const r = await fetch(`${API}/transcribe`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: headers({ "content-type": "application/json" }),
     body: JSON.stringify({ job_id: jobId }),
   });
   if (!r.ok) throw new Error(await r.text());
@@ -75,7 +86,7 @@ export async function exportToDestination(
 ) {
   const r = await fetch(`${API}/export`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: headers({ "content-type": "application/json" }),
     body: JSON.stringify({
       job_id: jobId,
       provider,
