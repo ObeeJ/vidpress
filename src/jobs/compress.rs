@@ -147,7 +147,7 @@ pub async fn run(
                 drop(store);
                 upsert_job(&db, &job_clone);
                 if let Some(url) = job_clone.webhook_url.clone() {
-                    let payload = serde_json::to_string(&job_clone).unwrap_or_default();
+                    let payload = serde_json::to_string(&job_clone.public()).unwrap_or_default();
                     tokio::spawn(async move { webhook::deliver(&url, &payload).await; });
                 }
             }
