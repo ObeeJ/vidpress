@@ -11,7 +11,12 @@ pub async fn preview(req: Request) -> Response {
 
     let id = req.params.get("id").cloned().unwrap_or_default();
     let caller_key = caller.as_ref().map(|k| k.key.as_str());
-    let job = match get_job_for(&state.db, &id, caller_key) {
+    let job = {
+        let store = state.jobs.lock().unwrap_or_else(|e| e.into_inner());
+        store.get(&id).filter(|j| j.owner_key.as_deref() == caller_key).cloned()
+    }.or_else(|| get_job_for(&state.db, &id, caller_key));
+
+    let job = match job {
         Some(j) => j,
         None => return Response { status: 404, body: r#"{"error":"job not found"}"#.into(), ..Default::default() },
     };

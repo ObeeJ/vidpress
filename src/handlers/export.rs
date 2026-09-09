@@ -1,11 +1,11 @@
 use glideapi::{FromRequest, Request, Response, State};
 use glideapi_macros::post;
-use crate::{auth::auth_and_rate, db::get_job, handlers::analyze::json_err, jobs::model::JobStatus, state::AppState};
+use crate::{auth::auth_and_rate, db::get_job_for, handlers::analyze::json_err, jobs::model::JobStatus, state::AppState};
 
 #[post("/export")]
 pub async fn export(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
-    if let Err(r) = auth_and_rate(&req, &state.db) { return r; }
+    let caller = match auth_and_rate(&req, &state.db) { Ok(c) => c, Err(r) => return r };
 
     let body: serde_json::Value = match serde_json::from_slice(&req.body) {
         Ok(v) => v,
@@ -15,8 +15,12 @@ pub async fn export(req: Request) -> Response {
         Some(j) => j,
         None    => return json_err(400, "missing job_id"),
     };
-    let job = state.jobs.lock().unwrap_or_else(|e| e.into_inner()).get(job_id).cloned()
-        .or_else(|| get_job(&state.db, job_id));
+    let caller_key = caller.as_ref().map(|k| k.key.as_str());
+    let job = {
+        let store = state.jobs.lock().unwrap_or_else(|e| e.into_inner());
+        store.get(job_id).filter(|j| j.owner_key.as_deref() == caller_key).cloned()
+    }.or_else(|| get_job_for(&state.db, job_id, caller_key));
+
     let (file_path, dest) = match job {
         Some(j) if matches!(j.status, JobStatus::Done) => (j.output_path, j.destination),
         Some(_) => return json_err(409, "job not completed yet"),
@@ -39,8 +43,6 @@ pub async fn export(req: Request) -> Response {
                 }
             }
         }
-        // Fabricating a plausible URL for a provider we do not support is worse
-        // than saying no — the customer discovers it when the file isn't there. (C7)
         "gdrive" | "dropbox" => return json_err(501, "provider not yet supported"),
         _ => return json_err(400, "unknown provider"),
     };
