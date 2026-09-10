@@ -11,7 +11,7 @@ export default function FaqPage() {
   return (
     <div className="page-shell">
       <Navbar />
-      <main style={{ flex: 1, maxWidth: 900, width: "100%", margin: "0 auto", padding: "60px 20px 80px" }}>
+      <main className="page-prose page-prose-wide">
         <PoemFaq showTitle={true} />
       </main>
       <Footer />

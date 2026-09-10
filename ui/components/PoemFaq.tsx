@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Wordmark from "@/components/Wordmark";
 
 interface PoemFaqProps {
   showTitle?: boolean;
@@ -91,7 +92,7 @@ export default function PoemFaq({ showTitle = true }: PoemFaqProps) {
         <div className="pf-header">
           <h2 className="pf-heading">Frequently asked questions</h2>
           <p className="pf-subheading">
-            Everything you need to know about theflate.
+            Everything you need to know about <Wordmark />
           </p>
         </div>
       )}

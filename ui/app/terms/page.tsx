@@ -11,7 +11,7 @@ export default function TermsPage() {
     <div className="page-shell">
       <Navbar />
 
-      <main style={{ flex: 1, maxWidth: 800, width: "100%", margin: "0 auto", padding: "60px 20px 80px" }}>
+      <main className="page-prose">
         <h1 style={{ fontSize: 32, fontWeight: 900, letterSpacing: "-1px", color: "var(--color-fg)", marginBottom: 8 }}>
           Terms of Service
         </h1>
