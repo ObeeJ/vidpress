@@ -182,10 +182,15 @@ crontab -l | grep theflate
 
 **Frontend** → Cloudflare Pages (set `NEXT_PUBLIC_BASE_URL` to your domain)
 
-**Backend** → Railway or any VPS with ffmpeg, yt-dlp, whisper installed
+**Backend** → Railway or any VPS with ffmpeg, yt-dlp, whisper-ctranslate2 installed
 
 ```bash
 # Install dependencies on Ubuntu/Debian
 sudo apt install ffmpeg
-pip3 install yt-dlp openai-whisper
+pip3 install yt-dlp whisper-ctranslate2
+# Pre-download the model at deploy time so the first request doesn't have to:
+python3 -c "from faster_whisper import WhisperModel; WhisperModel('large-v3', compute_type='int8')"
 ```
+
+The `Dockerfile` build already does all three of the above — this is only
+for a bare-VPS deployment without Docker.

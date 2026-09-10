@@ -8,9 +8,9 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - VIDPRESS_STORAGE=/tmp/theflate_output
-      - VIDPRESS_DB=/var/lib/theflate/theflate.db
-      - VIDPRESS_CORS_ORIGIN=http://localhost:3000
+      - THEFLATE_STORAGE=/tmp/theflate_output
+      - THEFLATE_DB=/var/lib/theflate/theflate.db
+      - THEFLATE_CORS_ORIGIN=http://localhost:3000
     volumes:
       - theflate-data:/var/lib/theflate
       - theflate-storage:/tmp/theflate_output

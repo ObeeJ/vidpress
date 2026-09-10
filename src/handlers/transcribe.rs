@@ -12,9 +12,9 @@ pub async fn transcribe(req: Request) -> Response {
 
     // --- BILLING / TIERED PLAN MODEL SELECTION ---
     // Previously: premium plan required for "medium" model.
-    // Commented/overridden to grant all users free access to the "medium" Whisper model.
-    // let model = if caller.as_ref().map(|k| k.plan == "premium").unwrap_or(false) { "medium" } else { "base" };
-    let model = "medium";
+    // Commented/overridden to grant all users free access to the top-tier model.
+    // let model = if caller.as_ref().map(|k| k.plan == "premium").unwrap_or(false) { "large-v3" } else { "base" };
+    let model = "large-v3";
 
     let body: serde_json::Value = match serde_json::from_slice(&req.body) {
         Ok(v) => v,
@@ -83,8 +83,16 @@ async fn run_transcription(
     let out_dir = storage_dir();
     let out_file = format!("{}/{}_transcript.json", out_dir, tid);
 
-    let whisper_result = Command::new("whisper")
-        .args([&path, "--model", &model, "--output_format", "json", "--output_dir", &out_dir])
+    // whisper-ctranslate2 (CTranslate2 / faster-whisper backend) instead of
+    // the reference openai-whisper CLI: int8-quantized large-v3 gets the
+    // full-size model's transcription quality at a fraction of the disk
+    // footprint and with meaningfully faster inference, so it can be baked
+    // into the deploy image (see Dockerfile) instead of downloaded at
+    // request time. Verified as a real drop-in, not assumed: same CLI shape
+    // (--model, --output_format json, --output_dir), same output JSON shape
+    // ({"text", "segments", "language"}) this handler already parses below.
+    let whisper_result = Command::new("whisper-ctranslate2")
+        .args([&path, "--model", &model, "--compute_type", "int8", "--output_format", "json", "--output_dir", &out_dir])
         .kill_on_drop(true)
         .output().await;
 
