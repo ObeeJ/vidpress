@@ -22,26 +22,70 @@ pub async fn transcribe(req: Request) -> Response {
     };
 
     let caller_key = caller.as_ref().map(|k| k.key.as_str());
-    let path = if let Some(jid) = body["job_id"].as_str() {
+    let job_id_owned = match body["job_id"].as_str() {
+        Some(s) => s.to_string(),
+        None => return Response { status: 400, body: r#"{"error":"missing job_id"}"#.into(), ..Default::default() },
+    };
+    let path = {
         let job = {
             let store = state.jobs.lock().unwrap_or_else(|e| e.into_inner());
-            store.get(jid).filter(|j| j.owner_key.as_deref() == caller_key).cloned()
-        }.or_else(|| get_job_for(&state.db, jid, caller_key));
+            store.get(job_id_owned.as_str()).filter(|j| j.owner_key.as_deref() == caller_key).cloned()
+        }.or_else(|| get_job_for(&state.db, &job_id_owned, caller_key));
         match job {
             Some(j) if matches!(j.status, JobStatus::Done) => j.output_path,
             Some(_) => return Response { status: 409, body: r#"{"error":"job not done yet"}"#.into(), ..Default::default() },
             None    => return Response { status: 404, body: r#"{"error":"job not found"}"#.into(), ..Default::default() },
         }
-    } else {
-        return Response { status: 400, body: r#"{"error":"missing job_id"}"#.into(), ..Default::default() };
     };
 
-    let tid      = Uuid::new_v4().to_string();
-    let out_dir  = storage_dir();
+    let tid = Uuid::new_v4().to_string();
+    {
+        let conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
+        conn.execute(
+            "INSERT INTO transcriptions(id,job_id,text,status) VALUES(?1,?2,'',?3)",
+            params![tid, job_id_owned, "queued"],
+        ).ok();
+    }
+
+    // Whisper used to run synchronously inside this handler: it bypassed
+    // job_sem (the same semaphore /upload uses to bound concurrent ffmpeg/
+    // whisper processes), and held the HTTP connection open for as long as
+    // transcription took — with the "medium" model, that's minutes. The 600s
+    // request_timeout would drop the connection but tokio::process::Command
+    // does not kill_on_drop by default, so the whisper process kept running
+    // orphaned in the background. (M7, M8)
+    let (db, jobs_store, sem, tid2, path2, model2) =
+        (state.db.clone(), state.jobs.clone(), state.job_sem.clone(), tid.clone(), path.clone(), model.to_string());
+    tokio::spawn(async move {
+        let _permit = sem.acquire_owned().await;
+        run_transcription(tid2, path2, model2, db, jobs_store).await;
+    });
+
+    Response {
+        status: 202,
+        body: serde_json::json!({ "transcription_id": tid, "status": "queued" }).to_string().into(),
+        ..Default::default()
+    }
+}
+
+async fn run_transcription(
+    tid: String,
+    path: String,
+    model: String,
+    db: crate::state::Db,
+    _jobs_store: crate::state::JobStore,
+) {
+    {
+        let conn = db.lock().unwrap_or_else(|e| e.into_inner());
+        conn.execute("UPDATE transcriptions SET status='processing' WHERE id=?1", params![tid]).ok();
+    }
+
+    let out_dir = storage_dir();
     let out_file = format!("{}/{}_transcript.json", out_dir, tid);
 
     let whisper_result = Command::new("whisper")
-        .args([&path, "--model", model, "--output_format", "json", "--output_dir", &out_dir])
+        .args([&path, "--model", &model, "--output_format", "json", "--output_dir", &out_dir])
+        .kill_on_drop(true)
         .output().await;
 
     match whisper_result {
@@ -55,22 +99,25 @@ pub async fn transcribe(req: Request) -> Response {
                 .and_then(|v| v["text"].as_str().map(|s| s.to_string()))
                 .unwrap_or(raw);
             {
-                let conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
+                let conn = db.lock().unwrap_or_else(|e| e.into_inner());
                 conn.execute(
-                    "INSERT INTO transcriptions(id,job_id,text) VALUES(?1,?2,?3)",
-                    params![tid, body["job_id"].as_str().unwrap_or(""), &text],
+                    "UPDATE transcriptions SET text=?1, status='done' WHERE id=?2",
+                    params![text, tid],
                 ).ok();
             }
             let _ = tokio::fs::rename(&whisper_out, &out_file).await;
-            Response { status: 200, body: serde_json::json!({ "id": tid, "text": text, "model": model }).to_string().into(), ..Default::default() }
         }
         Ok(o) => {
-            tracing::error!("whisper failed (exit {:?}):\n{}", o.status.code(), String::from_utf8_lossy(&o.stderr));
-            Response { status: 500, body: r#"{"error":"transcription failed"}"#.into(), ..Default::default() }
+            // Never return raw whisper/python stderr to a client — it can
+            // contain server filesystem paths. Log server-side only.
+            tracing::error!("whisper failed for transcription {tid} (exit {:?}):\n{}", o.status.code(), String::from_utf8_lossy(&o.stderr));
+            let conn = db.lock().unwrap_or_else(|e| e.into_inner());
+            conn.execute("UPDATE transcriptions SET status='failed' WHERE id=?1", params![tid]).ok();
         }
         Err(e) => {
-            tracing::error!("whisper spawn error: {e}");
-            Response { status: 500, body: r#"{"error":"whisper not found"}"#.into(), ..Default::default() }
+            tracing::error!("whisper spawn error for transcription {tid}: {e}");
+            let conn = db.lock().unwrap_or_else(|e| e.into_inner());
+            conn.execute("UPDATE transcriptions SET status='failed' WHERE id=?1", params![tid]).ok();
         }
     }
 }
@@ -82,9 +129,14 @@ pub async fn get_transcription(req: Request) -> Response {
     let id   = req.params.get("id").cloned().unwrap_or_default();
     let conn = state.db.lock().unwrap_or_else(|e| e.into_inner());
     match conn.query_row(
-        "SELECT id,job_id,text FROM transcriptions WHERE id=?1",
+        "SELECT id,job_id,text,status FROM transcriptions WHERE id=?1",
         params![id],
-        |r| Ok(serde_json::json!({ "id": r.get::<_,String>(0)?, "job_id": r.get::<_,String>(1)?, "text": r.get::<_,String>(2)? })),
+        |r| Ok(serde_json::json!({
+            "id": r.get::<_,String>(0)?,
+            "job_id": r.get::<_,String>(1)?,
+            "text": r.get::<_,String>(2)?,
+            "status": r.get::<_,Option<String>>(3)?.unwrap_or_else(|| "done".to_string()),
+        })),
     ) {
         Ok(v)  => Response { status: 200, body: v.to_string().into(), ..Default::default() },
         Err(_) => Response { status: 404, body: r#"{"error":"not found"}"#.into(), ..Default::default() },
