@@ -43,13 +43,18 @@ pub async fn detect_hw() -> HwEncoder {
         tracing::info!("hardware encoder: h264_nvenc");
         return HwEncoder::Nvenc;
     }
-    // Try VAAPI
+    // Try VAAPI. Must probe with the exact same -rc_mode/-qp the real
+    // encoder args use (see media/ffmpeg_args.rs) — a probe with no RC mode
+    // specified can succeed on a driver whose default RC mode differs from
+    // what production encoding actually requests, so a lenient probe here
+    // reports hardware as usable when every real job would fail.
     let vaapi = tokio::process::Command::new("ffmpeg")
         .args(["-hide_banner", "-loglevel", "error",
             "-vaapi_device", "/dev/dri/renderD128",
             "-f", "lavfi", "-i", "nullsrc=s=64x64:d=0.1",
             "-vf", "format=nv12,hwupload",
-            "-c:v", "h264_vaapi", "-f", "null", "-"])
+            "-c:v", "h264_vaapi", "-rc_mode", "CQP", "-qp", "23",
+            "-f", "null", "-"])
         .output().await;
     if matches!(vaapi, Ok(o) if o.status.success()) {
         tracing::info!("hardware encoder: h264_vaapi");

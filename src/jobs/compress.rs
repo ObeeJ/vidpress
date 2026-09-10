@@ -59,10 +59,18 @@ pub async fn run(
                 "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
                 "-movflags".into(), "+faststart".into(),
             ],
+            // No -rc_mode here on purpose: a target file size needs
+            // bitrate-based rate control (VBR/CBR), but this is the one
+            // VAAPI path that can't just add -rc_mode CQP like the others
+            // (media/ffmpeg_args.rs) - CQP is constant-*quality*, not
+            // constant-bitrate, so it has no bitrate target to give -b:v at
+            // all. A driver that only advertises CQP support (common on
+            // several VAAPI stacks) rejects this combination outright with
+            // "Driver does not support any RC mode compatible with selected
+            // options" - not a flag we forgot, a capability the hardware
+            // path doesn't have. Fall back to software, which does.
             HwEncoder::Vaapi => vec![
-                "-vaapi_device".into(), "/dev/dri/renderD128".into(),
-                "-vf".into(), "format=nv12,hwupload".into(),
-                "-c:v".into(), "h264_vaapi".into(),
+                "-c:v".into(), "libx264".into(), "-preset".into(), "ultrafast".into(),
                 "-b:v".into(), format!("{video_kbps}k"),
                 "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
                 "-movflags".into(), "+faststart".into(),

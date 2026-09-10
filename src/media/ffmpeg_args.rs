@@ -8,6 +8,11 @@ fn vaapi_video(crf_equiv: &str) -> Vec<String> {
         "-vaapi_device", "/dev/dri/renderD128",
         "-vf", "format=nv12,hwupload",
         "-c:v", "h264_vaapi",
+        // Explicit RC mode, not just -qp: some VAAPI drivers only support
+        // CQP and reject the encoder's default RC mode even when -qp is set,
+        // failing with "Driver does not support any RC mode compatible with
+        // selected options" despite -qp alone looking sufficient.
+        "-rc_mode", "CQP",
         "-qp", crf_equiv,          // VAAPI uses -qp instead of -crf
         "-c:a", "aac", "-b:a", "128k",
         "-movflags", "+faststart",
@@ -36,7 +41,7 @@ pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec
             HwEncoder::Nvenc => s(&["-c:v","h264_nvenc","-preset","p1","-cq","28",
                 "-vf","scale='min(1280,iw)':-2","-c:a","aac","-b:a","96k","-movflags","+faststart"]),
             HwEncoder::Vaapi => {
-                let mut a = s(&["-vaapi_device","/dev/dri/renderD128","-vf","scale='min(1280,iw)':-2,format=nv12,hwupload","-c:v","h264_vaapi","-qp","28"]);
+                let mut a = s(&["-vaapi_device","/dev/dri/renderD128","-vf","scale='min(1280,iw)':-2,format=nv12,hwupload","-c:v","h264_vaapi","-rc_mode","CQP","-qp","28"]);
                 a.extend(s(&["-c:a","aac","-b:a","96k","-movflags","+faststart"]));
                 a
             }
@@ -52,7 +57,7 @@ pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec
             HwEncoder::Vaapi => {
                 let mut a = s(&["-vaapi_device","/dev/dri/renderD128",
                     "-vf","scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2,format=nv12,hwupload",
-                    "-c:v","h264_vaapi","-qp","23"]);
+                    "-c:v","h264_vaapi","-rc_mode","CQP","-qp","23"]);
                 a.extend(s(&["-c:a","aac","-b:a","128k","-movflags","+faststart"]));
                 a
             }
@@ -66,7 +71,7 @@ pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec
             HwEncoder::Nvenc => s(&["-c:v","h264_nvenc","-preset","p1","-cq","23",
                 "-vf","scale='min(1920,iw)':-2","-c:a","aac","-b:a","128k","-movflags","+faststart"]),
             HwEncoder::Vaapi => {
-                let mut a = s(&["-vaapi_device","/dev/dri/renderD128","-vf","scale='min(1920,iw)':-2,format=nv12,hwupload","-c:v","h264_vaapi","-qp","23"]);
+                let mut a = s(&["-vaapi_device","/dev/dri/renderD128","-vf","scale='min(1920,iw)':-2,format=nv12,hwupload","-c:v","h264_vaapi","-rc_mode","CQP","-qp","23"]);
                 a.extend(s(&["-c:a","aac","-b:a","128k","-movflags","+faststart"]));
                 a
             }
@@ -79,7 +84,7 @@ pub fn preset_ffmpeg_args(preset: &Option<String>, hw: &HwEncoder) -> Option<Vec
             HwEncoder::Nvenc => s(&["-c:v","h264_nvenc","-preset","p1","-cq","26",
                 "-vf","scale='min(1280,iw)':-2","-c:a","aac","-b:a","96k","-t","140","-movflags","+faststart"]),
             HwEncoder::Vaapi => {
-                let mut a = s(&["-vaapi_device","/dev/dri/renderD128","-vf","scale='min(1280,iw)':-2,format=nv12,hwupload","-c:v","h264_vaapi","-qp","26"]);
+                let mut a = s(&["-vaapi_device","/dev/dri/renderD128","-vf","scale='min(1280,iw)':-2,format=nv12,hwupload","-c:v","h264_vaapi","-rc_mode","CQP","-qp","26"]);
                 a.extend(s(&["-c:a","aac","-b:a","96k","-t","140","-movflags","+faststart"]));
                 a
             }
