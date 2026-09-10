@@ -1,5 +1,5 @@
 # ── Stage 1: Build Rust Backend & whisper.cpp ──────────────────────────────────
-FROM rust:slim AS builder
+FROM debian:bookworm-slim AS builder
 
 RUN apt-get update && apt-get install -y \
     pkg-config \
@@ -8,7 +8,10 @@ RUN apt-get update && apt-get install -y \
     cmake \
     git \
     curl \
+    && curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable \
     && rm -rf /var/lib/apt/lists/*
+
+ENV PATH="/root/.cargo/bin:$PATH"
 
 WORKDIR /app
 

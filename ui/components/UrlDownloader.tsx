@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { API, downloadFile } from "@/lib/api";
-import { toast } from "@/lib/toast";
+import { toast, toastError } from "@/lib/toast";
 import Button from "@/components/primitives/Button";
 
 export default function UrlDownloader() {
@@ -42,15 +42,15 @@ export default function UrlDownloader() {
           setStatus(job.status);
           if (job.status === "done" || job.status === "failed") {
             if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
-            if (job.status === "done") toast("Ready to download", "success");
-            else toast("Download failed", "error");
+      if (job.status === "done") toast("Ready to download", "success");
+            else toast("Download failed. Check the URL and try again.", "error");
           }
         } catch {
           if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
         }
       }, 1500);
     } catch (e: unknown) {
-      toast(String(e), "error");
+      toastError(e, "Couldn't fetch that URL. Make sure it's a supported platform.");
     } finally {
       setLoading(false);
     }
@@ -109,7 +109,7 @@ export default function UrlDownloader() {
       )}
 
       {status === "failed" && (
-        <div className="fc-error">Download failed. Check the URL and try again.</div>
+        <div className="fc-error">That URL couldn't be downloaded. Check it's from a supported platform and try again.</div>
       )}
     </div>
   );

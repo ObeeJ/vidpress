@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useStore, FileItem } from "@/lib/store";
 import { ingestFile, analyzeFile, uploadFile, downloadFile, getJob, transcribeFile, getTranscription, exportToDestination, API } from "@/lib/api";
 import { QRCodeSVG } from "qrcode.react";
-import { toast } from "@/lib/toast";
+import { toast, toastError } from "@/lib/toast";
 import Button from "@/components/primitives/Button";
 import CountUp from "@/components/CountUp";
 
@@ -100,8 +100,9 @@ export default function FileCard({ item }: { item: FileItem }) {
       })
       .then((p) => setProfile(item.localUrl, p))
       .catch((e) => {
-        setError(item.localUrl, `Upload failed: ${e}`);
-        toast(`Upload failed: ${e}`, "error");
+        const msg = e instanceof Error && e.message.length < 120 ? e.message.replace(/^Error:\s*/i, "") : "Upload failed. Check your file and try again.";
+        setError(item.localUrl, msg);
+        toastError(e, "Upload failed. Check your file and try again.");
       });
   }, [item.file, item.localUrl, item.profile, item.error, item.ingestId, setUploadPct, setIngestId, setProfile, setError]);
 
@@ -115,13 +116,13 @@ export default function FileCard({ item }: { item: FileItem }) {
         setJob(item.localUrl, job);
         if (job.status === "done" || job.status === "failed") {
           if (pollRef.current) clearInterval(pollRef.current);
-          if (job.status === "done") toast(`${item.file.name} theflated successfully`, "success");
-          if (job.status === "failed") toast(`Failed to theflate ${item.file.name}`, "error");
+          if (job.status === "done") toast(`${item.file.name} compressed successfully`, "success");
+          if (job.status === "failed") toast(`Compression failed for ${item.file.name}. Try a different preset or format.`, "error");
         }
       } catch {
         if (++pollFailsRef.current >= 5) {
           if (pollRef.current) clearInterval(pollRef.current);
-          setError(item.localUrl, "Lost connection to server");
+          setError(item.localUrl, "Lost connection to the server. Refresh and try again.");
         }
       }
     }, 800);
@@ -161,10 +162,11 @@ export default function FileCard({ item }: { item: FileItem }) {
         selectedPreset === "original" ? targetMb : undefined,
       );
       setJobId(item.localUrl, job_id);
-      toast("Theflating your file...", "info");
+      toast("Compression started", "info");
     } catch (e) {
-      setError(item.localUrl, String(e));
-      toast(String(e), "error");
+      const msg = e instanceof Error && e.message.length < 120 ? e.message.replace(/^Error:\s*/i, "") : "Couldn't start compression. Try again.";
+      setError(item.localUrl, msg);
+      toastError(e, "Couldn't start compression. Try again.");
     }
   }
 
@@ -186,7 +188,7 @@ export default function FileCard({ item }: { item: FileItem }) {
       }
       throw new Error("Transcription timed out");
     } catch (e) {
-      toast(`Transcription failed: ${e}`, "error");
+      toastError(e, "Transcription failed. The audio may be too short or unclear.");
     } finally {
       setTranscribing(false);
     }
@@ -203,7 +205,7 @@ export default function FileCard({ item }: { item: FileItem }) {
       setExportedUrl(res.remote_url);
       toast(`Exported directly to ${exportProvider.toUpperCase()}`, "success");
     } catch (e) {
-      toast(`Cloud export failed: ${e}`, "error");
+      toastError(e, "Export failed. Check your bucket name and credentials.");
     } finally {
       setExporting(false);
     }

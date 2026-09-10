@@ -1,38 +1,75 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 
-// ── Toast system ──────────────────────────────────────────────────────────────
-type Toast = { id: number; msg: string; type: "success" | "error" | "info" };
-let _toastId = 0;
-let _setToasts: ((fn: (t: Toast[]) => Toast[]) => void) | null = null;
+type ToastType = "success" | "error" | "info";
+type Toast = { id: number; msg: string; type: ToastType };
 
-export function toast(msg: string, type: Toast["type"] = "info") {
-  if (_setToasts) {
-    const id = ++_toastId;
-    _setToasts((t) => [...t, { id, msg, type }]);
-    setTimeout(() => _setToasts?.((t) => t.filter((x) => x.id !== id)), 4000);
-  }
+let _id = 0;
+let _set: ((fn: (t: Toast[]) => Toast[]) => void) | null = null;
+
+export function toast(msg: string, type: ToastType = "info") {
+  if (!_set) return;
+  const id = ++_id;
+  _set((t) => [...t, { id, msg, type }]);
+  setTimeout(() => _set?.((t) => t.filter((x) => x.id !== id)), 5000);
 }
+
+/** Maps a raw caught error to a user-friendly message, then toasts it. */
+export function toastError(e: unknown, fallback = "Something went wrong. Please try again.") {
+  const raw = e instanceof Error ? e.message : String(e);
+  // Strip "Error: " prefix that JS adds
+  const clean = raw.replace(/^Error:\s*/i, "").trim();
+
+  // Map known server/network patterns to friendly copy
+  const msg =
+    /rate.?limit/i.test(clean)         ? "You're going too fast — slow down a bit and retry." :
+    /unauthorized|401/i.test(clean)    ? "Your API key isn't valid. Check it in settings." :
+    /forbidden|403/i.test(clean)       ? "You don't have permission to do that." :
+    /not.?found|404/i.test(clean)      ? "That file or job no longer exists." :
+    /too.?large|413/i.test(clean)      ? "File is too large to upload. Try a smaller file." :
+    /unsupported|415/i.test(clean)     ? "That file format isn't supported yet." :
+    /timeout|timed.?out/i.test(clean)  ? "The request timed out. Check your connection and retry." :
+    /network|fetch|failed to fetch/i.test(clean) ? "Can't reach the server. Check your connection." :
+    /websocket/i.test(clean)           ? "Live connection dropped. Refresh and try again." :
+    /disk|storage|no space/i.test(clean) ? "Server is out of storage space. Try again later." :
+    /ffmpeg|codec/i.test(clean)        ? "Media processing failed. Try a different format." :
+    /transcri/i.test(clean)            ? "Transcription failed. The audio may be too short or unclear." :
+    clean.length > 0 && clean.length < 120 ? clean : fallback;
+
+  toast(msg, "error");
+}
+
+const ICONS: Record<ToastType, string> = {
+  success: "✓",
+  error:   "✕",
+  info:    "·",
+};
 
 export function Toaster() {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  useEffect(() => { _setToasts = setToasts; return () => { _setToasts = null; }; }, []);
+  useEffect(() => { _set = setToasts; return () => { _set = null; }; }, []);
+
+  const dismiss = useCallback((id: number) => {
+    setToasts((t) => t.filter((x) => x.id !== id));
+  }, []);
+
   if (!toasts.length) return null;
+
   return (
-    <div style={{ position: "fixed", bottom: 24, right: 24, display: "flex", flexDirection: "column", gap: 8, zIndex: 9999 }}>
+    <div className="toaster">
       {toasts.map((t) => (
-        <div key={t.id} style={{
-          padding: "12px 18px", borderRadius: 12, fontSize: 13, fontWeight: 600, maxWidth: 360,
-          background: t.type === "error" ? "#ef444422" : t.type === "success" ? "#22c55e22" : "#7c3aed22",
-          border: `1px solid ${t.type === "error" ? "#ef444466" : t.type === "success" ? "#22c55e66" : "#7c3aed66"}`,
-          color: t.type === "error" ? "#fca5a5" : t.type === "success" ? "#86efac" : "#c4b5fd",
-          backdropFilter: "blur(8px)",
-          animation: "slideIn 0.2s ease",
-        }}>
-          {t.msg}
+        <div key={t.id} className={`toast toast-${t.type}`} role="alert" aria-live="assertive">
+          <span className="toast-icon" aria-hidden="true">{ICONS[t.type]}</span>
+          <span className="toast-msg">{t.msg}</span>
+          <button
+            className="toast-dismiss"
+            onClick={() => dismiss(t.id)}
+            aria-label="Dismiss"
+          >
+            ×
+          </button>
         </div>
       ))}
-      <style>{`@keyframes slideIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}`}</style>
     </div>
   );
 }

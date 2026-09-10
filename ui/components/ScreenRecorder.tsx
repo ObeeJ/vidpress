@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useStore } from "@/lib/store";
 import { ingestFile, analyzeFile } from "@/lib/api";
-import { toast } from "@/lib/toast";
+import { toast, toastError } from "@/lib/toast";
 import Button from "@/components/primitives/Button";
 
 type RecordState = "idle" | "recording" | "processing";
@@ -57,7 +57,7 @@ export default function ScreenRecorder() {
       setElapsed(0);
       timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
     } catch (e) {
-      toast(`Screen capture failed: ${e}`, "error");
+      toastError(e, "Screen capture was denied or unavailable. Check browser permissions.");
     }
   }
 
@@ -80,8 +80,8 @@ export default function ScreenRecorder() {
       setProfile(localUrl, profile);
       toast("Screen recording ready to theflate", "success");
     } catch (e) {
-      setError(localUrl, String(e));
-      toast(String(e), "error");
+      setError(localUrl, "Recording upload failed. Check your connection and try again.");
+      toastError(e, "Recording upload failed. Check your connection and try again.");
     } finally {
       setState("idle");
     }

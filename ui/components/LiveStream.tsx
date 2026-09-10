@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { downloadFile } from "@/lib/api";
-import { toast } from "@/lib/toast";
+import { toast, toastError } from "@/lib/toast";
 import Button from "@/components/primitives/Button";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8081";
@@ -46,13 +46,13 @@ export default function LiveStream() {
           const msg = JSON.parse(e.data);
           if (msg.job_id) {
             setJobIdLocal(msg.job_id);
-            toast("Stream captured: ready to download when ended", "info");
+            toast("Stream captured — download when you end the session", "info");
           }
         } catch {}
       };
 
       ws.onerror = () => {
-        toast("WebSocket connection failed", "error");
+        toast("Live connection dropped. Refresh and try again.", "error");
         setStreamState("idle");
         stream.getTracks().forEach((t) => t.stop());
       };
@@ -62,7 +62,7 @@ export default function LiveStream() {
         stream.getTracks().forEach((t) => t.stop());
       };
     } catch (e) {
-      toast(`Stream failed: ${e}`, "error");
+      toastError(e, "Screen capture was denied or unavailable. Check browser permissions.");
       setStreamState("idle");
     }
   }
