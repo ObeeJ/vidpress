@@ -13,7 +13,7 @@ const FAQS = [
     question: "What exactly does theflate do?",
     content: (
       <p className="pf-muted-body">
-        theflate compresses, converts, and transcribes media files — video, audio, and images. Drop a file, pick your output format or preset, and get a smaller file back in seconds. You can also pull video or audio directly from a YouTube, Instagram, TikTok, X, or Facebook link without downloading anything first.
+        theflate compresses, converts, and transcribes media files: video, audio, and images. Drop a file, pick your output format or preset, and get a smaller file back in seconds. You can also pull video or audio directly from a YouTube, Instagram, TikTok, X, or Facebook link without downloading anything first.
       </p>
     ),
   },
@@ -23,7 +23,7 @@ const FAQS = [
     question: "Which formats and codecs are supported?",
     content: (
       <div className="pf-muted-body pf-content-body">
-        <div><strong>Video:</strong> MP4, MOV, MKV, WebM, AVI — encoded with H.264 or H.265/HEVC</div>
+        <div><strong>Video:</strong> MP4, MOV, MKV, WebM, AVI, encoded with H.264 or H.265/HEVC</div>
         <div><strong>Audio:</strong> MP3, AAC, M4A, WAV, FLAC, OGG</div>
         <div><strong>Images:</strong> JPG, PNG, WebP, GIF</div>
         <div><strong>Transcription:</strong> Any video or audio file → plain text via OpenAI Whisper</div>
@@ -56,7 +56,7 @@ const FAQS = [
     question: "Can I use theflate programmatically in my own app?",
     content: (
       <p className="pf-muted-body">
-        Yes. theflate exposes a REST API — upload a file, queue a job, poll for completion, download the result. You can attach a webhook URL to get notified the moment a job finishes instead of polling. See the <a href="/docs" style={{ color: "var(--color-signal)", textDecoration: "none", fontWeight: 600 }}>API Docs</a> for the full reference.
+        Yes. theflate exposes a REST API. Upload a file, queue a job, poll for completion, download the result. You can attach a webhook URL to get notified the moment a job finishes instead of polling. See the <a href="/docs" style={{ color: "var(--color-signal)", textDecoration: "none", fontWeight: 600 }}>API Docs</a> for the full reference.
       </p>
     ),
   },
@@ -66,7 +66,7 @@ const FAQS = [
     question: "Are there any file size or job limits?",
     content: (
       <p className="pf-muted-body">
-        There are no hard file size caps enforced at the upload level — large files are handled the same as small ones. Rate limits apply per IP on anonymous requests (10 req/min). If you need higher throughput, grab an API key.
+        There are no hard file size caps enforced at the upload level. Large files are handled the same as small ones. Rate limits apply per IP on anonymous requests (10 req/min). If you need higher throughput, grab an API key.
       </p>
     ),
   },
@@ -76,7 +76,7 @@ const FAQS = [
     question: "How does the transcription work?",
     content: (
       <p className="pf-muted-body">
-        Transcription runs on OpenAI Whisper locally — your audio never leaves the server to a third-party transcription service. Submit a job ID to <code style={{ fontSize: 12, background: "var(--color-surface-2)", padding: "1px 6px", borderRadius: 4 }}>/transcribe</code> and poll <code style={{ fontSize: 12, background: "var(--color-surface-2)", padding: "1px 6px", borderRadius: 4 }}>/transcriptions/:id</code> for the result.
+        Transcription runs on OpenAI Whisper locally. Your audio never leaves the server to a third-party transcription service. Submit a job ID to <code style={{ fontSize: 12, background: "var(--color-surface-2)", padding: "1px 6px", borderRadius: 4 }}>/transcribe</code> and poll <code style={{ fontSize: 12, background: "var(--color-surface-2)", padding: "1px 6px", borderRadius: 4 }}>/transcriptions/:id</code> for the result.
       </p>
     ),
   },

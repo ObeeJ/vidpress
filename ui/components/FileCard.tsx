@@ -323,7 +323,7 @@ export default function FileCard({ item }: { item: FileItem }) {
                   <span className="fc-info-icon" tabIndex={0} aria-label="Quality notice">
                     i
                     <span className="fc-tooltip" role="tooltip">
-                      This size is smaller than the source resolution can cleanly support —
+                      This size is smaller than the source resolution can cleanly support.
                       we&apos;ll automatically reduce the resolution to hit it. You can still
                       slide lower; quality will trade off further.
                     </span>
@@ -333,7 +333,7 @@ export default function FileCard({ item }: { item: FileItem }) {
               <div className="fc-slider-value">
                 <span className="fc-stat-value">{targetMb.toFixed(1)} MB</span>
                 <span className="fc-savings-badge">
-                  −{savingPct}%
+                  {savingPct}%
                 </span>
               </div>
             </div>

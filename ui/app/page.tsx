@@ -34,7 +34,7 @@ export default function Home() {
           </h1>
 
           <p className="lede">
-            Drop any video, audio, or image. Get a smaller file back in seconds — no account, no limits, no nonsense.
+            Drop any video, audio, or image. Get a smaller file back in seconds. No account, no limits, no nonsense.
           </p>
         </div>
 

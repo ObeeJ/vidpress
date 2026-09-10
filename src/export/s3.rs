@@ -26,6 +26,13 @@ pub async fn upload(cfg: &DestinationConfig, local_path: &str) -> Result<String,
         let ep = if endpoint.starts_with("http") { endpoint.to_string() }
                  else { format!("https://{endpoint}") };
         builder = builder.endpoint_url(ep);
+        // Every non-AWS S3-compatible service we support (MinIO, R2, Supabase
+        // Storage) needs path-style addressing (endpoint/bucket/key) — the
+        // SDK's default virtual-hosted-style (bucket.endpoint/key) silently
+        // drops the bucket and misroutes the object when the endpoint isn't
+        // configured to recognize bucket subdomains. Confirmed by a real
+        // MinIO upload that landed under the wrong bucket entirely.
+        builder = builder.force_path_style(true);
     }
 
     let client = Client::from_conf(builder.build());
@@ -40,9 +47,12 @@ pub async fn upload(cfg: &DestinationConfig, local_path: &str) -> Result<String,
         .map_err(|e| format!("s3 put: {e}"))?;
 
     let url = match cfg.endpoint.as_deref() {
+        // Path-style, matching force_path_style(true) above — a
+        // virtual-hosted-style URL here would look plausible but 404 for any
+        // endpoint (MinIO, R2, Supabase) not configured for bucket subdomains.
         Some(ep) => {
-            let ep = ep.trim_end_matches('/').trim_start_matches("https://").trim_start_matches("http://");
-            format!("https://{bucket}.{ep}/{key}")
+            let ep = ep.trim_end_matches('/');
+            format!("{ep}/{bucket}/{key}")
         }
         None => format!("https://{bucket}.s3.{region}.amazonaws.com/{key}"),
     };

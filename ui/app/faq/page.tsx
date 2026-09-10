@@ -4,7 +4,7 @@ import PoemFaq from "@/components/PoemFaq";
 
 export const metadata = {
   title: "FAQ | theflate",
-  description: "Frequently asked questions about theflate — compression, formats, API, pricing, and privacy.",
+  description: "Frequently asked questions about theflate: compression, formats, API, pricing, and privacy.",
 };
 
 export default function FaqPage() {
