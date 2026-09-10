@@ -3,7 +3,7 @@ import path from "path";
 
 const FIXTURE = path.join(__dirname, "fixture.mp4");
 
-test("compress happy path — result size smaller than original", async ({ page }) => {
+test("compress happy path - result size smaller than original", async ({ page }) => {
   await page.goto("/");
 
   // Upload via the hidden file input

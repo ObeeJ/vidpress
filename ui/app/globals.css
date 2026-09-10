@@ -1,14 +1,14 @@
 @import "tailwindcss";
 
 /* ============================================================================
-   theflate — design foundation
+   theflate - design foundation
    Direction: "precision instrument". The product measures a file and makes it
    smaller. The interface should read like calibrated equipment, not a landing
    page: one signal colour against warm ink, monospace for every number, and
    motion that contracts rather than floats.
 
    Everything below is a token. Components should reference tokens, never
-   literals — that is the difference between a system and 345 inline styles.
+   literals - that is the difference between a system and 345 inline styles.
    ========================================================================== */
 
 @theme {
@@ -38,7 +38,7 @@
   --color-on-signal:  #0C0C0E;
 
   /* Lime as a FILL works on any ground; lime as TEXT does not. On the light
-     canvas #C9F24E lands at ~1.15:1 against the background — invisible, and
+     canvas #C9F24E lands at ~1.15:1 against the background - invisible, and
      far under the 4.5:1 WCAG floor. Anything that paints the signal colour
      onto *type* must use this token, which is remapped for light mode. */
   --color-signal-text: #C9F24E;
@@ -49,16 +49,16 @@
   /* --- type ---------------------------------------------------------------
      Families are injected by next/font in app/layout.tsx as CSS variables.
      Archivo: industrial grotesque, real character, variable weight.
-     JetBrains Mono: every numeral — sizes, percentages, ETAs, IDs. Numbers
+     JetBrains Mono: every numeral - sizes, percentages, ETAs, IDs. Numbers
      are this product's content, so they get their own voice and tabular
      figures so they stop jittering as they count. */
   --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, "SF Mono", monospace;
 
   /* Modular scale, 1.25 ratio, anchored at 16px. Root stays 16px so browser
-     font-size preferences and rem-based spacing keep working — the previous
+     font-size preferences and rem-based spacing keep working - the previous
      `font-size: 14px` on <html> silently broke both. */
-  --text-2xs:  0.6875rem;  /* 11px — mono labels only */
+  --text-2xs:  0.6875rem;  /* 11px - mono labels only */
   --text-xs:   0.75rem;    /* 12px */
   --text-sm:   0.875rem;   /* 14px */
   --text-base: 1rem;       /* 16px */
@@ -91,7 +91,7 @@
 
   /* --- motion -------------------------------------------------------------
      One easing family, four durations. Every transition in the app picks from
-     this list; nothing invents its own timing. `--ease-out` is an expo curve —
+     this list; nothing invents its own timing. `--ease-out` is an expo curve -
      it leaves fast and settles slowly, which reads as "responsive" rather than
      "animated". */
   --ease-out:    cubic-bezier(0.16, 1, 0.30, 1);
@@ -117,7 +117,7 @@
 }
 
 html {
-  /* 16px root. Do not set a px font-size here again — it breaks rem scaling
+  /* 16px root. Do not set a px font-size here again - it breaks rem scaling
      and overrides the user's browser font-size preference (WCAG 1.4.4). */
   -webkit-text-size-adjust: 100%;
   scroll-behavior: smooth;
@@ -136,7 +136,7 @@ body {
 }
 
 /* Numerals never reflow mid-count. Applies to any element showing a measured
-   value — file sizes, percentages, ETAs, bitrates. */
+   value - file sizes, percentages, ETAs, bitrates. */
 .tabular,
 [data-numeric] {
   font-family: var(--font-mono);
@@ -171,7 +171,7 @@ p { text-wrap: pretty; }
 }
 
 /* ---------------------------------------------------------------------------
-   focus — the single largest accessibility gap in the current UI.
+   focus - the single largest accessibility gap in the current UI.
    Not one interactive element had a visible focus style. This gives every
    focusable thing one, for free, and only for keyboard users.
    ------------------------------------------------------------------------ */
@@ -201,8 +201,8 @@ p { text-wrap: pretty; }
    motion primitives
 
    Two ideas, and only two:
-     1. `reveal`   — entrance. Rises 6px and settles. Stagger with --i.
-     2. `contract` — the signature. Things arrive by *tightening*, which is
+     1. `reveal`   - entrance. Rises 6px and settles. Stagger with --i.
+     2. `contract` - the signature. Things arrive by *tightening*, which is
                      what the product does to files. This is the one gesture
                      worth remembering, so it is spent sparingly: the result
                      number, and nothing else.
@@ -219,7 +219,7 @@ p { text-wrap: pretty; }
   100% { opacity: 1; transform: scale(1);    letter-spacing: -0.01em; }
 }
 
-/* A single sweep of light along a track. Used for indeterminate work only —
+/* A single sweep of light along a track. Used for indeterminate work only -
    never as decoration. */
 @keyframes sweep {
   from { transform: translate3d(-100%, 0, 0); }
@@ -259,7 +259,7 @@ p { text-wrap: pretty; }
 }
 
 /* ---------------------------------------------------------------------------
-   reduced motion — WCAG 2.3.3.
+   reduced motion - WCAG 2.3.3.
    The current build has three infinite animations (two SMIL, one CSS) that
    run forever regardless of this setting. Everything decorative stops here;
    anything that communicates progress degrades to a static state rather than
@@ -291,7 +291,7 @@ p { text-wrap: pretty; }
 /* ---------------------------------------------------------------------------
    controls
 
-   Renamed from `.vpx-button-*` to `.btn-*` — the token-backed styling was
+   Renamed from `.vpx-button-*` to `.btn-*` - the token-backed styling was
    already in place, this was a pure find-and-replace across Button.tsx,
    poem/page.tsx and this file, with no visual change.
    ------------------------------------------------------------------------ */
@@ -353,7 +353,7 @@ p { text-wrap: pretty; }
   border-color: #D6FF62;
 }
 
-/* 1px, not a scale transform — the press should feel like a key travelling,
+/* 1px, not a scale transform - the press should feel like a key travelling,
    and it must not blur text on the way down. */
 .btn:active,
 .btn-primary:active,
@@ -398,11 +398,11 @@ p { text-wrap: pretty; }
   to   { background-position: -200% 0; }
 }
 
-/* Legacy alias — `.animate-vpx-pulse` is referenced by existing components. */
+/* Legacy alias - `.animate-vpx-pulse` is referenced by existing components. */
 .animate-vpx-pulse { animation: breathe 1.8s var(--ease-in-out) infinite; }
 
 /* ---------------------------------------------------------------------------
-   layout helper — one measure, so the nav and the content actually align.
+   layout helper - one measure, so the nav and the content actually align.
    They currently do not: Navbar uses maxWidth 1100, page.tsx uses 900.
    ------------------------------------------------------------------------ */
 
@@ -440,7 +440,7 @@ p { text-wrap: pretty; }
 }
 
 /* ---------------------------------------------------------------------------
-   Mobile — 16px gutters across every frame.
+   Mobile - 16px gutters across every frame.
    All horizontal padding that exceeds 16px on desktop is clamped here so
    nothing bleeds to the screen edge on 375px viewports.
    ------------------------------------------------------------------------ */
@@ -454,11 +454,11 @@ p { text-wrap: pretty; }
   .fc-header { padding-inline: var(--spacing-4); }
   .fc-body   { padding: var(--spacing-4); gap: var(--spacing-4); }
 
-  /* 4-col stat grid collapses to 2x2 on mobile — "2160×3840" no longer overflows */
+  /* 4-col stat grid collapses to 2x2 on mobile - "2160×3840" no longer overflows */
   .fc-stat-grid-4 { grid-template-columns: repeat(2, 1fr); }
 
   /* 3-col results grid collapses to a single row of 3 narrow cells.
-     At 375px - 32px padding = 343px / 3 = ~114px each — tight but readable.
+     At 375px - 32px padding = 343px / 3 = ~114px each - tight but readable.
      Drop font size slightly so values don't clip. */
   .fc-stat-grid-3 { grid-template-columns: repeat(3, 1fr); }
   .fc-stat-grid-3 .fc-stat-value { font-size: var(--text-xs); }
@@ -481,14 +481,14 @@ p { text-wrap: pretty; }
   .fc-export-row .btn-primary,
   .fc-export-row .btn-sm { width: 100%; justify-content: center; }
 
-  /* Actions row: already flex, buttons already flex:1 — just reduce gap */
+  /* Actions row: already flex, buttons already flex:1 - just reduce gap */
   .fc-actions { gap: var(--spacing-2); }
 
   /* DropZone: reduce tall vertical padding on small screens */
   .dropzone { padding: var(--spacing-8) var(--spacing-4); }
 
   /* Footer */
-  .footer { padding: var(--spacing-8) var(--spacing-4) var(--spacing-6); }
+  .footer { padding-block: var(--spacing-8) var(--spacing-6); }
 
   /* UrlDownloader / ScreenRecorder / LiveStream panels */
   .ud-card { padding: var(--spacing-4); }
@@ -505,7 +505,7 @@ p { text-wrap: pretty; }
 }
 
 /* ---------------------------------------------------------------------------
-   responsive type — the hero is currently a fixed 46px, which overflows at
+   responsive type - the hero is currently a fixed 46px, which overflows at
    375px. Clamp is the whole fix and needs no breakpoints.
    ------------------------------------------------------------------------ */
 
@@ -537,7 +537,7 @@ p { text-wrap: pretty; }
    page shell, hero, and tab bar (Task 3.5)
 
    Migrated off inline styles so the tab bar can carry :hover/:focus-visible
-   and the whole shell can respond to breakpoints — neither is possible with
+   and the whole shell can respond to breakpoints - neither is possible with
    style={{}}. The active/inactive tab colors used to be computed in JS via a
    ternary on every render; [aria-selected] does the same job in CSS, for
    free, and screen readers already need that attribute for the tablist role.
@@ -552,7 +552,8 @@ p { text-wrap: pretty; }
 
 .page-main {
   flex: 1;
-  padding: var(--spacing-12) 0 var(--spacing-16);
+  /* padding-block only — .measure owns the horizontal gutter (see above). */
+  padding-block: var(--spacing-12) var(--spacing-16);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-8);
@@ -624,7 +625,7 @@ p { text-wrap: pretty; }
 /* ---------------------------------------------------------------------------
    FileCard (Task 3.5)
 
-   70 inline style={{}} objects lived here — the largest concentration in the
+   70 inline style={{}} objects lived here - the largest concentration in the
    app, and the component where responsive/hover/focus states matter most
    (it is the primary result the user looks at after every job). Selected/
    unselected pill states used to be a JS ternary computing a background and
@@ -1020,7 +1021,7 @@ p { text-wrap: pretty; }
   50%      { opacity: 1; }
 }
 
-/* FileCard — small static modifiers that were left as inline styles on the
+/* FileCard - small static modifiers that were left as inline styles on the
    first pass of Task 3.5 and shouldn't have been (only genuinely dynamic,
    runtime-computed values belong inline: bar widths/colors driven by job
    progress, and the --i custom property .reveal already uses this way). */
@@ -1036,7 +1037,7 @@ p { text-wrap: pretty; }
 .fc-export-link { color: #10b981; font-weight: 700; }
 
 /* DropZone's real control is a visually-hidden <input> (1px, opacity:0) so
-   it stays in the accessibility tree and is keyboard-reachable — but that
+   it stays in the accessibility tree and is keyboard-reachable - but that
    means a :focus-visible outline drawn on the input itself is imperceptible.
    The visible wrapper needs to carry the ring instead, via :focus-within on
    the ancestor whose child is what actually receives focus. (Task 3.3) */
@@ -1048,7 +1049,7 @@ p { text-wrap: pretty; }
 
 /* ---------------------------------------------------------------------------
    Navbar
-   Previously used var(--border) which is undefined — the bottom border was
+   Previously used var(--border) which is undefined - the bottom border was
    invisible. Moved all inline styles here so active/hover states are CSS-only
    and transition: all is replaced with named properties.
    ------------------------------------------------------------------------ */
@@ -1063,7 +1064,10 @@ p { text-wrap: pretty; }
 }
 
 .navbar-inner {
-  padding: var(--spacing-3) 0;
+  /* padding-block, never the shorthand: this element also carries .measure,
+     whose padding-inline is the app's gutter. A `padding: x 0` shorthand here
+     would reset that to 0 and push the logo flush against the screen edge. */
+  padding-block: var(--spacing-3);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1177,14 +1181,17 @@ p { text-wrap: pretty; }
 
 /* ---------------------------------------------------------------------------
    Footer
-   Previously used var(--border) (undefined) — top border was invisible.
+   Previously used var(--border) (undefined) - top border was invisible.
    All inline styles moved here; hardcoded hex replaced with tokens.
    ------------------------------------------------------------------------ */
 
 .footer {
   border-top: 1px solid var(--color-line);
   background: var(--color-ink);
-  padding: var(--spacing-12) var(--spacing-5) var(--spacing-8);
+  /* Vertical only. The inner element carries .measure, so adding horizontal
+     padding here too would inset footer content twice as far as every other
+     page section. */
+  padding-block: var(--spacing-12) var(--spacing-8);
   margin-top: auto;
 }
 
@@ -1282,7 +1289,7 @@ p { text-wrap: pretty; }
 }
 
 /* ---------------------------------------------------------------------------
-   UrlDownloader / ScreenRecorder / LiveStream — shared panel classes
+   UrlDownloader / ScreenRecorder / LiveStream - shared panel classes
    All three components previously used hardcoded hex (#09090b, #27272a, etc.)
    outside the token system. Unified here.
    ------------------------------------------------------------------------ */
@@ -1449,7 +1456,7 @@ p { text-wrap: pretty; }
 .btn-sm { padding: 0.375rem 0.75rem; font-size: var(--text-xs); }
 
 /* ---------------------------------------------------------------------------
-   PoemFaq — accordion component
+   PoemFaq - accordion component
    Previously used ~30 inline style={{}} objects with hardcoded hex.
    ------------------------------------------------------------------------ */
 
@@ -1669,9 +1676,9 @@ p { text-wrap: pretty; }
 .pf-list-strong { color: var(--color-fg); }
 
 /* ===========================================================================
-   LIGHT THEME — Dub design system
+   LIGHT THEME - Dub design system
    Applied via [data-theme="light"] on <html>. Every dark token is remapped
-   to its Dub light equivalent. Components reference the same token names —
+   to its Dub light equivalent. Components reference the same token names -
    nothing in component code changes.
    =========================================================================== */
 
@@ -1690,7 +1697,7 @@ p { text-wrap: pretty; }
   --color-fg-3:       #a3a3a3;   /* placeholder → Silver */
 
   /* --- signal: acid lime matching dark mode ------------------------------- */
-  --color-signal:     #C9F24E;   /* Acid Lime — signature brand voltage */
+  --color-signal:     #C9F24E;   /* Acid Lime - signature brand voltage */
   --color-signal-dim: #94b829;   /* Dimmed Lime */
   --color-on-signal:  #171717;   /* dark text on lime */
 
@@ -1703,7 +1710,7 @@ p { text-wrap: pretty; }
   --color-danger:     #ef4444;   /* red */
 }
 
-/* body overrides for light — background and text color */
+/* body overrides for light - background and text color */
 [data-theme="light"] body {
   background: #f5f5f5;
   color: #171717;
@@ -1873,7 +1880,7 @@ p { text-wrap: pretty; }
 /* Queue heading */
 [data-theme="light"] .queue-heading { color: #171717; }
 
-/* Theme toggle button — sits in the navbar */
+/* Theme toggle button - sits in the navbar */
 .theme-toggle {
   display: inline-flex;
   align-items: center;
@@ -1898,7 +1905,7 @@ p { text-wrap: pretty; }
 }
 
 /* ---------------------------------------------------------------------------
-   Docs page — "service manual for a precision instrument"
+   Docs page - "service manual for a precision instrument"
 
    The reference sheet for the machine the rest of the app is. Sections are
    numbered channels, endpoints are a monospace-aligned spec table, and the
@@ -1926,7 +1933,7 @@ p { text-wrap: pretty; }
   display: flex;
   flex-direction: column;
   gap: 2px;
-  /* The rail is navigation, not content — it must never scroll the page. */
+  /* The rail is navigation, not content - it must never scroll the page. */
   max-height: calc(100vh - var(--spacing-24));
   overflow-y: auto;
 }
@@ -1941,7 +1948,7 @@ p { text-wrap: pretty; }
   padding: 0 var(--spacing-3) var(--spacing-3);
 }
 
-/* Active state is carried by weight and ground alone — no accent edge. */
+/* Active state is carried by weight and ground alone - no accent edge. */
 .docs-rail-link {
   display: flex;
   align-items: baseline;
@@ -2182,7 +2189,7 @@ p { text-wrap: pretty; }
   background: var(--color-surface-2);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-md);
-  /* Wide snippets scroll inside the block — the page never scrolls sideways. */
+  /* Wide snippets scroll inside the block - the page never scrolls sideways. */
   overflow-x: auto;
   color: var(--color-fg);
   /* Real JetBrains Mono, not the browser's default monospace. */
@@ -2227,7 +2234,7 @@ p { text-wrap: pretty; }
 }
 
 /* The base-URL copy sits inline in the masthead, not over a code block, so it
-   has no hover target to be revealed by — it stays visible. */
+   has no hover target to be revealed by - it stays visible. */
 .docs-copy-btn-static {
   position: static;
   opacity: 1;
@@ -2253,7 +2260,7 @@ p { text-wrap: pretty; }
   margin-bottom: var(--spacing-2);
 }
 
-/* A standing note about the section below it — quieter than a card, louder
+/* A standing note about the section below it - quieter than a card, louder
    than body copy, marked by a signal rule rather than a coloured fill. */
 .docs-notice {
   margin-bottom: var(--spacing-5);
@@ -2351,7 +2358,7 @@ p { text-wrap: pretty; }
   border-radius: var(--radius-md);
   overflow: hidden;
   transition: border-color var(--dur-1) var(--ease-out);
-  /* Staggered entrance — rows arrive in sequence like a readout populating. */
+  /* Staggered entrance - rows arrive in sequence like a readout populating. */
   animation: docs-row-in var(--dur-3) var(--ease-out) backwards;
   animation-delay: calc(var(--i, 0) * 40ms);
 }
@@ -2384,7 +2391,7 @@ p { text-wrap: pretty; }
 
 .docs-ep-head:hover { background: var(--color-surface-2); }
 
-/* Fixed width so every path starts at the same x — the spec-sheet alignment
+/* Fixed width so every path starts at the same x - the spec-sheet alignment
    that makes a list of endpoints scannable as a table. */
 .docs-ep-method {
   flex: none;
@@ -2514,7 +2521,7 @@ p { text-wrap: pretty; }
     white-space: nowrap;
   }
 
-  /* Horizontal tabs need a positional indicator, so the underline returns —
+  /* Horizontal tabs need a positional indicator, so the underline returns -
      but in neutral ink, not the accent. */
   .docs-rail-link[data-active="true"] {
     border-bottom-color: var(--color-fg);
@@ -2531,7 +2538,7 @@ p { text-wrap: pretty; }
 }
 
 /* ---------------------------------------------------------------------------
-   Page eyebrow — replaces the generic .label pill on page headers.
+   Page eyebrow - replaces the generic .label pill on page headers.
    Signal-tinted so it reads on both dark and light backgrounds.
    ------------------------------------------------------------------------ */
 
@@ -2562,7 +2569,7 @@ p { text-wrap: pretty; }
 }
 
 /* ---------------------------------------------------------------------------
-   Logo mark — interactive hover + press
+   Logo mark - interactive hover + press
    The SVG lines animate on hover: they compress further (scale X shrinks),
    reinforcing what the product does. Press gives a physical click feel.
    ------------------------------------------------------------------------ */
@@ -2620,7 +2627,7 @@ p { text-wrap: pretty; }
 }
 
 /* ---------------------------------------------------------------------------
-   Inline wordmark — the logo's hover gesture, usable mid-sentence.
+   Inline wordmark - the logo's hover gesture, usable mid-sentence.
 
    TheflateLogo is a block element built for the navbar, so it can't sit inside
    running text. This is its inline twin: same dot-lift on hover, so the brand
@@ -2649,7 +2656,7 @@ p { text-wrap: pretty; }
 }
 
 .wordmark-dot {
-  /* inline-block so transform applies — inline elements ignore it */
+  /* inline-block so transform applies - inline elements ignore it */
   display: inline-block;
   color: var(--color-signal-text);
   font-weight: 600;
@@ -2700,7 +2707,7 @@ p { text-wrap: pretty; }
   transform: translateX(100%);
 }
 
-/* Droplet press — the button "dips" like pressing into liquid */
+/* Droplet press - the button "dips" like pressing into liquid */
 .btn-primary:active,
 .btn-secondary:active,
 .btn:active {
@@ -2708,7 +2715,7 @@ p { text-wrap: pretty; }
 }
 
 /* ---------------------------------------------------------------------------
-   Light mode — primary button stays lime (signal) with black text,
+   Light mode - primary button stays lime (signal) with black text,
    matching dark mode behaviour exactly.
    ------------------------------------------------------------------------ */
 

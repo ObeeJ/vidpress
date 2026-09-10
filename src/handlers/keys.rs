@@ -50,6 +50,6 @@ pub async fn create_key(req: Request) -> Response {
             return json_err(500, "internal error");
         }
     }
-    // Return the plaintext key exactly once — it is unrecoverable afterwards.
+    // Return the plaintext key exactly once - it is unrecoverable afterwards.
     Response { status: 201, body: serde_json::json!({ "key": key, "name": name, "plan": plan }).to_string().into(), ..Default::default() }
 }

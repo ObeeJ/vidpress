@@ -29,7 +29,7 @@ pub async fn analyze(req: Request) -> Response {
 }
 
 /// Build a correctly-escaped JSON error. Never interpolate an error string
-/// into a format! literal — ffprobe messages contain quotes and produce
+/// into a format! literal - ffprobe messages contain quotes and produce
 /// invalid JSON that the frontend's r.json() throws on. (M1)
 pub fn json_err(status: u16, msg: &str) -> Response {
     Response { status, body: serde_json::json!({ "error": msg }).to_string().into(), ..Default::default() }

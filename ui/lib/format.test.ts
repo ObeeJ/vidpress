@@ -9,7 +9,7 @@ test("bytes uses binary units with two decimals", () => {
 
 test("ratio returns a true minus sign and handles zero", () => {
   expect(ratio(1000, 120)).toBe("−88%");
-  expect(ratio(0, 0)).toBe("—");
+  expect(ratio(0, 0)).toBe("-");
 });
 
 test("duration formats as m:ss", () => {

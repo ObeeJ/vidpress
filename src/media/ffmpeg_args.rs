@@ -2,7 +2,7 @@ use crate::{media::detect::MediaKind, state::HwEncoder};
 
 fn s(v: &[&str]) -> Vec<String> { v.iter().map(|s| s.to_string()).collect() }
 
-/// VAAPI filter chain prefix — upload to GPU, encode, download result.
+/// VAAPI filter chain prefix - upload to GPU, encode, download result.
 fn vaapi_video(crf_equiv: &str) -> Vec<String> {
     s(&[
         "-vaapi_device", "/dev/dri/renderD128",

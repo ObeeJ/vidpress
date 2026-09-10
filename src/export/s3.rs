@@ -6,7 +6,7 @@ use aws_sdk_s3::{
 use crate::jobs::model::DestinationConfig;
 
 /// Upload `local_path` to an S3-compatible endpoint. Returns the canonical
-/// object URL on success. Streams the file — never reads it into memory. (C7)
+/// object URL on success. Streams the file - never reads it into memory. (C7)
 pub async fn upload(cfg: &DestinationConfig, local_path: &str) -> Result<String, String> {
     let access_key = cfg.access_key.as_deref().unwrap_or_default();
     let secret_key = cfg.secret_key.as_deref().unwrap_or_default();
@@ -27,7 +27,7 @@ pub async fn upload(cfg: &DestinationConfig, local_path: &str) -> Result<String,
                  else { format!("https://{endpoint}") };
         builder = builder.endpoint_url(ep);
         // Every non-AWS S3-compatible service we support (MinIO, R2, Supabase
-        // Storage) needs path-style addressing (endpoint/bucket/key) — the
+        // Storage) needs path-style addressing (endpoint/bucket/key) - the
         // SDK's default virtual-hosted-style (bucket.endpoint/key) silently
         // drops the bucket and misroutes the object when the endpoint isn't
         // configured to recognize bucket subdomains. Confirmed by a real
@@ -47,7 +47,7 @@ pub async fn upload(cfg: &DestinationConfig, local_path: &str) -> Result<String,
         .map_err(|e| format!("s3 put: {e}"))?;
 
     let url = match cfg.endpoint.as_deref() {
-        // Path-style, matching force_path_style(true) above — a
+        // Path-style, matching force_path_style(true) above - a
         // virtual-hosted-style URL here would look plausible but 404 for any
         // endpoint (MinIO, R2, Supabase) not configured for bucket subdomains.
         Some(ep) => {

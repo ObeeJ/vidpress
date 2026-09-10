@@ -22,7 +22,7 @@ export function toastError(e: unknown, fallback = "Something went wrong. Please 
 
   // Map known server/network patterns to friendly copy
   const msg =
-    /rate.?limit/i.test(clean)         ? "You're going too fast — slow down a bit and retry." :
+    /rate.?limit/i.test(clean)         ? "You're going too fast - slow down a bit and retry." :
     /unauthorized|401/i.test(clean)    ? "Your API key isn't valid. Check it in settings." :
     /forbidden|403/i.test(clean)       ? "You don't have permission to do that." :
     /not.?found|404/i.test(clean)      ? "That file or job no longer exists." :

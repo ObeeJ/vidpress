@@ -14,7 +14,7 @@ fn num_cpus() -> String {
     std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2).to_string()
 }
 
-/// Codec name plus its own `-preset` value — x264/x265 use named presets
+/// Codec name plus its own `-preset` value - x264/x265 use named presets
 /// ("medium"), SVT-AV1 uses a numeric one (0=slowest/best..13=fastest; 6 is
 /// AV1's own documented balance point, distinct from x264/x265's "medium").
 fn target_mb_codec() -> (&'static str, &'static str) {
@@ -374,7 +374,7 @@ pub async fn run(
                     let payload = serde_json::to_string(&job_clone.public()).unwrap_or_default();
                     tokio::spawn(async move { webhook::deliver(&url, &payload).await; });
                 }
-                // Evict from the in-memory cache — the job is terminal and the
+                // Evict from the in-memory cache - the job is terminal and the
                 // DB is now the source of truth. Without this the HashMap grows
                 // without bound on a busy server. (M6)
                 jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);

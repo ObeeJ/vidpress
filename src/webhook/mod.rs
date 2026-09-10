@@ -3,12 +3,12 @@ pub mod sign;
 use std::time::Duration;
 
 /// Returns true only for http/https URLs that resolve to public IP addresses.
-/// String prefix matching cannot be made correct — decimal-encoded IPs,
+/// String prefix matching cannot be made correct - decimal-encoded IPs,
 /// octal, IPv6-mapped addresses, and userinfo confusion all defeat it.
 /// DNS resolution defeats all of them at once. (H3, H4)
 pub fn is_public_url(url: &str) -> bool {
     let url = url.trim();
-    // Only http/https — reject file:, gopher:, etc.
+    // Only http/https - reject file:, gopher:, etc.
     if !url.starts_with("http://") && !url.starts_with("https://") {
         return false;
     }
@@ -16,7 +16,7 @@ pub fn is_public_url(url: &str) -> bool {
         Some(s) => s,
         None => return false,
     };
-    // Strip userinfo (user@host) — a common bypass vector.
+    // Strip userinfo (user@host) - a common bypass vector.
     let after = match after.splitn(2, '@').last() {
         Some(s) => s,
         None => return false,
@@ -97,7 +97,7 @@ pub async fn deliver(url: &str, payload: &str) {
                 tracing::info!("webhook delivered to {url} on attempt {attempt}");
                 return;
             }
-            // Client errors (4xx) will never succeed — don't retry.
+            // Client errors (4xx) will never succeed - don't retry.
             Ok(r) if r.status().is_client_error() => {
                 tracing::warn!("webhook {url} returned {} (client error, not retrying)", r.status());
                 return;

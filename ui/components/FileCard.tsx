@@ -134,7 +134,7 @@ export default function FileCard({ item }: { item: FileItem }) {
   const originalMb = profile ? profile.size_bytes / 1048576 : 0;
   const minMb = profile ? Math.max(0.01, +(originalMb * 0.01).toFixed(2)) : 0;
   const targetMb = item.targetMb ?? profile?.estimated_output_mb ?? 0;
-  // Mirrors MIN_BITS_PER_PIXEL in src/jobs/compress.rs::run — below this the
+  // Mirrors MIN_BITS_PER_PIXEL in src/jobs/compress.rs::run - below this the
   // backend scales resolution down to hit the target size, so warn here
   // instead of letting it happen as a silent surprise.
   const belowQualityFloor = (() => {
@@ -174,7 +174,7 @@ export default function FileCard({ item }: { item: FileItem }) {
     if (!job?.id) return;
     setTranscribing(true);
     try {
-      // Backend is async — returns {transcription_id}, not {text}. Poll until done.
+      // Backend is async - returns {transcription_id}, not {text}. Poll until done.
       const { transcription_id } = await transcribeFile(job.id);
       for (let i = 0; i < 120; i++) {
         await new Promise((r) => setTimeout(r, 2000));
@@ -389,7 +389,7 @@ export default function FileCard({ item }: { item: FileItem }) {
         {/* Done State */}
         {job?.status === "done" && (
           <div className="fc-progress-row fc-done-gap">
-            {/* Contract gesture — the signature motion moment */}
+            {/* Contract gesture - the signature motion moment */}
             <div className="contract tabular fc-stat-grid fc-stat-grid-3">
               {stat("Original", fmt(job.original_bytes))}
               <div className="fc-stat">

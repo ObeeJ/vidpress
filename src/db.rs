@@ -55,7 +55,7 @@ pub fn init_db(conn: &Connection) {
         CREATE INDEX IF NOT EXISTS idx_ingests_created ON ingests(created_at);
     ").expect("db init failed");
 
-    // Migrations — each runs individually so a duplicate-column error on an
+    // Migrations - each runs individually so a duplicate-column error on an
     // existing DB does not abort the rest. execute_batch() stops at the first
     // failure, which silently skipped every migration after the first on any
     // existing database. (H12)
@@ -86,7 +86,7 @@ pub fn upsert_job(db: &Db, job: &Job) {
     // Strip secret credentials before persisting. Non-secret metadata
     // (provider, bucket, endpoint, region, target_path) is kept so the job
     // record retains display/audit context. Credentials must be supplied
-    // fresh at export time via POST /export — never read back from the DB.
+    // fresh at export time via POST /export - never read back from the DB.
     // Wire safety is separately guaranteed by PublicJob which strips
     // destination entirely.
     let dest_json = job.destination.as_ref().and_then(|d| {
@@ -170,7 +170,7 @@ pub fn get_job(db: &Db, id: &str) -> Option<Job> {
     ).ok()
 }
 
-/// Scoped accessor — returns `None` when the caller does not own the job.
+/// Scoped accessor - returns `None` when the caller does not own the job.
 /// SQLite's `IS` compares NULLs correctly: anonymous job (owner_key NULL)
 /// matches `caller = None` and nothing else. Returns 404-equivalent for both
 /// "not found" and "wrong owner" so it is not an existence oracle.

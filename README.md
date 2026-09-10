@@ -1,17 +1,17 @@
 # theflate
 
-> Compress, convert, download, and transcribe any media — instantly. Built for developers and non-technical users alike.
+> Compress, convert, download, and transcribe any media - instantly. Built for developers and non-technical users alike.
 
 ## What it does
 
-- **Compress** video, audio, and images — quality-preserving two-pass H.265 (`libx265`) bitrate encoding for target file sizes, plus H.264, AAC, WebP, MP3, FLAC, and more
+- **Compress** video, audio, and images - quality-preserving two-pass H.265 (`libx265`) bitrate encoding for target file sizes, plus H.264, AAC, WebP, MP3, FLAC, and more
 - **Convert** between formats (MP4, MOV, MKV, WebM, AVI, MP3, M4A, OGG, WAV, FLAC, JPG, PNG, WebP, GIF)
-- **Download** from YouTube, Instagram, TikTok, X (Twitter), Facebook — video or audio-only
+- **Download** from YouTube, Instagram, TikTok, X (Twitter), Facebook - video or audio-only
 - **Transcribe** audio/video to text using OpenAI Whisper (`large-v3` for everyone)
-- **Preset profiles** — WhatsApp, Instagram Reel, Web, Twitter/X, Original
-- **Webhooks** — get notified when jobs complete, with HMAC signing on premium
-- **QR code sharing** — scan to download on any device
-- **Media preview** — preview before downloading
+- **Preset profiles** - WhatsApp, Instagram Reel, Web, Twitter/X, Original
+- **Webhooks** - get notified when jobs complete, with HMAC signing on premium
+- **QR code sharing** - scan to download on any device
+- **Media preview** - preview before downloading
 
 ## Stack
 
@@ -148,7 +148,7 @@ Respond with HTTP 2xx to acknowledge. Retries on 5xx/429 only (3 attempts, expon
 | API Scale | $49/mo | Unlimited | 3,000 |
 | White-label Basic | $19/mo | Unlimited | 3,000 |
 | White-label Pro | $49/mo | Unlimited + resell | 3,000 |
-| Source License | $299 one-time | Self-host forever | — |
+| Source License | $299 one-time | Self-host forever | - |
 
 ## White-label
 
@@ -157,7 +157,7 @@ Each white-label domain is **exclusively locked** to one account. No two compani
 1. Buy a white-label plan at `/pricing`
 2. Enter your domain (e.g. `compress.yourbrand.com`) and brand name
 3. Add a CNAME DNS record pointing to the theflate server
-4. Your users see your brand — we handle the infrastructure
+4. Your users see your brand - we handle the infrastructure
 
 ## Nginx setup
 
@@ -193,5 +193,5 @@ pip3 install yt-dlp whisper-ctranslate2
 python3 -c "from faster_whisper import WhisperModel; WhisperModel('large-v3', compute_type='int8')"
 ```
 
-The `Dockerfile` build already does all three of the above — this is only
+The `Dockerfile` build already does all three of the above - this is only
 for a bare-VPS deployment without Docker.

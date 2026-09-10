@@ -34,7 +34,7 @@ pub fn start_session(id: &str) -> Result<StreamSession, String> {
             "-i", "pipe:0",                          // read from stdin
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
             "-c:a", "aac", "-b:a", "128k",
-            // fragmented MP4 — allows reading before EOF
+            // fragmented MP4 - allows reading before EOF
             "-movflags", "+frag_keyframe+empty_moov+default_base_moof+faststart",
             "-f", "mp4",
             &output,

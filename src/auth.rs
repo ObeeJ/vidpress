@@ -58,7 +58,7 @@ pub fn extract_ip(req: &Request) -> String {
         if let Some(fwd) = req.headers.get("x-forwarded-for") {
             // Read from the right. `nginx.conf:33` sets
             // `X-Forwarded-For $proxy_add_x_forwarded_for`, which *appends* the
-            // peer address to whatever the client sent — so the leftmost entry
+            // peer address to whatever the client sent - so the leftmost entry
             // is entirely attacker-controlled. Taking it (as this function used
             // to) makes the rate limiter a no-op: every request can claim a
             // fresh IP just by setting a header.
@@ -77,7 +77,7 @@ pub fn extract_ip(req: &Request) -> String {
     }
     // Not behind a trusted proxy: we cannot see the peer address through the
     // framework, so every anonymous caller shares a single bucket. Strict by
-    // design — the previous "127.0.0.1" had the same effect but read like a
+    // design - the previous "127.0.0.1" had the same effect but read like a
     // real per-client limit.
     "unknown".into()
 }

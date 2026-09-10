@@ -44,7 +44,7 @@ pub async fn detect_hw() -> HwEncoder {
         return HwEncoder::Nvenc;
     }
     // Try VAAPI. Must probe with the exact same -rc_mode/-qp the real
-    // encoder args use (see media/ffmpeg_args.rs) — a probe with no RC mode
+    // encoder args use (see media/ffmpeg_args.rs) - a probe with no RC mode
     // specified can succeed on a driver whose default RC mode differs from
     // what production encoding actually requests, so a lenient probe here
     // reports hardware as usable when every real job would fail.

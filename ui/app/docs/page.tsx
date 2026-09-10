@@ -22,7 +22,7 @@ const SECTIONS = [
 const CODE: Record<CodeLang, { label: string } & Record<Workflow, string>> = {
   curl: {
     label: "cURL",
-    submit: `# 1. Stream the raw bytes in — returns an ingest_id.
+    submit: `# 1. Stream the raw bytes in - returns an ingest_id.
 INGEST=$(curl -s -X POST "${BASE}/ingest" \\
   -H "x-file-name: input_video.mp4" \\
   -H "x-api-key: vp_YOUR_API_KEY" \\
@@ -50,7 +50,7 @@ curl -X POST "${BASE}/upload" \\
 app.post("/hooks/theflate", (req, res) => {
   const { job_id, status, compressed_bytes } = req.body;
   if (status === "done") {
-    console.log(\`\${job_id} ready — \${compressed_bytes} bytes\`);
+    console.log(\`\${job_id} ready - \${compressed_bytes} bytes\`);
   }
   res.sendStatus(200);
 });`,
@@ -85,7 +85,7 @@ curl -X POST "${BASE}/export" \\
 
 const KEY = process.env.THEFLATE_API_KEY!;
 
-// 1. Raw bytes in — the body IS the file, not multipart form data.
+// 1. Raw bytes in - the body IS the file, not multipart form data.
 const ingestRes = await fetch("${BASE}/ingest", {
   method: "POST",
   headers: { "x-file-name": "input_video.mp4", "x-api-key": KEY },
@@ -109,7 +109,7 @@ const jobRes = await fetch("${BASE}/upload", {
 const job = await jobRes.json(); // { job_id, status, estimated_time_secs }`,
     webhook: `import crypto from "node:crypto";
 
-// The signed message is \`\${timestamp}.\${rawBody}\` — pass the RAW body,
+// The signed message is \`\${timestamp}.\${rawBody}\` - pass the RAW body,
 // not the parsed object, or the digest will never match.
 export function verify(rawBody: string, header: string, secret: string) {
   const parts = Object.fromEntries(
@@ -166,7 +166,7 @@ const { remote_url } = await res.json();`,
 KEY = os.environ["THEFLATE_API_KEY"]
 BASE = "${BASE}"
 
-# 1. Raw bytes in — data=, not files=.
+# 1. Raw bytes in - data=, not files=.
 with open("input_video.mp4", "rb") as f:
     ingest = requests.post(
         f"{BASE}/ingest",
@@ -250,7 +250,7 @@ const base = "${BASE}"
 func submit(path string) (map[string]any, error) {
 	key := os.Getenv("THEFLATE_API_KEY")
 
-	// 1. Raw bytes in — the body IS the file.
+	// 1. Raw bytes in - the body IS the file.
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -387,7 +387,7 @@ const ENDPOINTS: Endpoint[] = [
     path: "/ingest",
     auth: "optional",
     title: "Stream raw file bytes",
-    desc: "Send the file as the raw request body — not multipart form data. MOV, AVI and MKV containers are remuxed to MP4 on the way in. Returns the ingest_id that every downstream call takes.",
+    desc: "Send the file as the raw request body. not multipart form data. MOV, AVI and MKV containers are remuxed to MP4 on the way in. Returns the ingest_id that every downstream call takes.",
     req: `Headers:
   x-file-name: video.mp4      (required)
   x-api-key:   vp_...         (optional)
@@ -422,7 +422,7 @@ Body: the raw file bytes`,
     path: "/upload",
     auth: "optional",
     title: "Queue a compression job",
-    desc: "Queues the actual encode. Give it a target_mb and it runs a two-pass libx265 encode to hit that size; if the target is too small to carry the source resolution, it scales the video down rather than returning a full-resolution smear. Attach a destination here — /export reads it later.",
+    desc: "Queues the actual encode. Give it a target_mb and it runs a two-pass libx265 encode to hit that size; if the target is too small to carry the source resolution, it scales the video down rather than returning a full-resolution smear. Attach a destination here. /export reads it later.",
     req: `{
   "ingest_id": "ing_8f291a0c",
   "target_mb": 50,
@@ -443,7 +443,7 @@ Body: the raw file bytes`,
     path: "/jobs/:id",
     auth: "optional",
     title: "Poll job status",
-    desc: "Returns progress from 0-100, an ETA, and the original vs compressed byte counts. Poll this until status is \"done\" or \"failed\" — or skip polling entirely and use a webhook.",
+    desc: "Returns progress from 0-100, an ETA, and the original vs compressed byte counts. Poll this until status is \"done\" or \"failed\". or skip polling entirely and use a webhook.",
     res: `{
   "id": "job_8f291a0c",
   "status": "done",
@@ -492,7 +492,7 @@ Body: the raw file bytes`,
     path: "/transcribe",
     auth: "required",
     title: "Transcribe speech to text",
-    desc: "Runs Whisper large-v3 locally against a finished job. Returns immediately with a transcription_id — transcription runs in the background, so poll /transcriptions/:id for the text.",
+    desc: "Runs Whisper large-v3 locally against a finished job. Returns immediately with a transcription_id. transcription runs in the background, so poll /transcriptions/:id for the text.",
     req: `{ "job_id": "job_8f291a0c" }`,
     res: `202 Accepted
 
@@ -518,7 +518,7 @@ Body: the raw file bytes`,
     path: "/export",
     auth: "required",
     title: "Push to your bucket",
-    desc: "Streams a finished job straight into the destination that was attached at /upload time — the file never round-trips through your server. Returns 409 if the job has not finished, and 400 if no destination was configured for it.",
+    desc: "Streams a finished job straight into the destination that was attached at /upload time. the file never round-trips through your server. Returns 409 if the job has not finished, and 400 if no destination was configured for it.",
     req: `{
   "job_id": "job_8f291a0c",
   "provider": "s3"
@@ -534,7 +534,7 @@ Body: the raw file bytes`,
     path: "/keys",
     auth: "admin",
     title: "Provision an API key",
-    desc: "Mints a key against a plan tier. Requires the x-admin-token header — this is a server-operator endpoint, not a self-service signup route, and returns 403 without it. The plaintext key is shown exactly once and is unrecoverable afterwards.",
+    desc: "Mints a key against a plan tier. Requires the x-admin-token header. this is a server-operator endpoint, not a self-service signup route, and returns 403 without it. The plaintext key is shown exactly once and is unrecoverable afterwards.",
     req: `Headers:
   x-admin-token: <server operator token>
 
@@ -584,7 +584,7 @@ const STATUS_CODES = [
   { code: "401", ok: false, desc: "The x-api-key header is missing or does not match a known key." },
   { code: "403", ok: false, desc: "Admin-only route reached without a valid x-admin-token." },
   { code: "404", ok: false, desc: "No job, transcription, or ingest exists with that id for this caller." },
-  { code: "409", ok: false, desc: "The job exists but has not finished yet — wait for status \"done\"." },
+  { code: "409", ok: false, desc: "The job exists but has not finished yet. wait for status \"done\"." },
   { code: "413", ok: false, desc: "The uploaded file is larger than the server's configured body limit." },
   { code: "415", ok: false, desc: "The file type is not a supported video, audio, or image container." },
   { code: "429", ok: false, desc: "Rate limit exhausted for your IP or key tier. Back off and retry." },
@@ -693,7 +693,7 @@ export default function DocsPage() {
             </h1>
             <p className="docs-lede">
               Target-size video and audio compression, speech-to-text, and direct
-              cloud delivery — over plain HTTP and JSON. No SDK required.
+              cloud delivery. over plain HTTP and JSON. No SDK required.
             </p>
 
             <div className="docs-basebar">
@@ -725,7 +725,7 @@ export default function DocsPage() {
             </div>
           </header>
 
-          {/* 01 — Quickstart */}
+          {/* 01. Quickstart */}
           <section className="docs-section" id="quickstart" aria-labelledby="quickstart-title">
             <SectionHead num="01" title="Quickstart" id="quickstart" />
             <div className="docs-steps">
@@ -762,7 +762,7 @@ export default function DocsPage() {
             </div>
           </section>
 
-          {/* 02 — Delivery */}
+          {/* 02. Delivery */}
           <section className="docs-section" id="delivery" aria-labelledby="delivery-title">
             <SectionHead num="02" title="Getting the file back" id="delivery" />
             <div className="docs-steps">
@@ -771,7 +771,7 @@ export default function DocsPage() {
                 <h3 className="docs-step-title">Push on completion</h3>
                 <p className="docs-step-body">
                   Pass a <code className="docs-inline-code">webhook_url</code> when you
-                  queue the job and theflate POSTs to it the moment encoding finishes —
+                  queue the job and theflate POSTs to it the moment encoding finishes -
                   signed with HMAC-SHA256 over{" "}
                   <code className="docs-inline-code">{"{timestamp}.{body}"}</code> so you
                   can verify it really came from us. Beats polling for anything longer
@@ -793,7 +793,7 @@ export default function DocsPage() {
             </div>
           </section>
 
-          {/* 03 — Examples */}
+          {/* 03. Examples */}
           <section className="docs-section" id="examples" aria-labelledby="examples-title">
             <SectionHead num="03" title="Examples" id="examples" />
 
@@ -843,11 +843,11 @@ export default function DocsPage() {
             </div>
           </section>
 
-          {/* 04 — Rate limits */}
+          {/* 04. Rate limits */}
           <section className="docs-section" id="limits" aria-labelledby="limits-title">
             <SectionHead num="04" title="Rate limits" id="limits" />
             <p className="docs-notice">
-              Every tier below is <strong>free while theflate is in preview</strong> —
+              Every tier below is <strong>free while theflate is in preview</strong> -
               there is no billing and nothing to buy yet. The limits are here so you
               can see the shape of things; the paid tiers switch on later.
             </p>
@@ -865,7 +865,7 @@ export default function DocsPage() {
             </div>
           </section>
 
-          {/* 05 — Endpoints */}
+          {/* 05. Endpoints */}
           <section className="docs-section" id="endpoints" aria-labelledby="endpoints-title">
             <SectionHead num="05" title="Endpoints" id="endpoints" />
 
@@ -938,7 +938,7 @@ export default function DocsPage() {
             </div>
           </section>
 
-          {/* 06 — Status codes */}
+          {/* 06. Status codes */}
           <section className="docs-section" id="status" aria-labelledby="status-title">
             <SectionHead num="06" title="Status codes" id="status" />
             <div className="docs-err-grid">

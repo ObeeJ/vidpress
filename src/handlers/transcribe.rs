@@ -48,7 +48,7 @@ pub async fn transcribe(req: Request) -> Response {
     // Whisper used to run synchronously inside this handler: it bypassed
     // job_sem (the same semaphore /upload uses to bound concurrent ffmpeg/
     // whisper processes), and held the HTTP connection open for as long as
-    // transcription took — with the "medium" model, that's minutes. The 600s
+    // transcription took - with the "medium" model, that's minutes. The 600s
     // request_timeout would drop the connection but tokio::process::Command
     // does not kill_on_drop by default, so the whisper process kept running
     // orphaned in the background. (M7, M8)

@@ -9,7 +9,7 @@ interface JobProgressProps {
 
 export default function JobProgress({ status, progress }: JobProgressProps) {
   // "queued" is always indeterminate regardless of a stale/leftover progress
-  // value — a job that hasn't started has nothing meaningful to show a
+  // value - a job that hasn't started has nothing meaningful to show a
   // percentage for. Only "processing" additionally requires progress === 0.
   // (Parenthesizing this as `(queued || processing) && progress === 0`
   // looks like a harmless clarity fix but silently changes the behavior:

@@ -36,7 +36,7 @@ export default function ScreenRecorder() {
         ]);
         stream = mixed;
       } catch {
-        // mic unavailable — screen audio only
+        // mic unavailable - screen audio only
       }
 
       chunksRef.current = [];

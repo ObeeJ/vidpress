@@ -31,7 +31,7 @@ test("reduced motion: CountUp renders final value immediately", async ({ page })
   // Emulate prefers-reduced-motion
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  // The page loads without error — CountUp is only rendered post-job,
+  // The page loads without error - CountUp is only rendered post-job,
   // so we just assert the page is functional.
   await expect(page.locator("h1")).toBeVisible();
 });

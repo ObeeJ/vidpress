@@ -2,7 +2,7 @@
 //!
 //! Why this exists: `/upload`, `/analyze` and `/transcribe` all take a `path`
 //! straight from the request body and hand it to ffmpeg/ffprobe/whisper. Those
-//! binaries do not treat their input as a filesystem path — ffmpeg resolves
+//! binaries do not treat their input as a filesystem path - ffmpeg resolves
 //! `http:`, `concat:`, `subfile:`, `data:` and friends as *protocols*. So an
 //! unguarded `path` is simultaneously an arbitrary-file-read and a full SSRF
 //! primitive. Everything user-supplied must come through `resolve_input`.
@@ -30,7 +30,7 @@ pub enum PathError {
 }
 
 impl PathError {
-    /// Deliberately coarse — never echo the offending path back to the caller.
+    /// Deliberately coarse - never echo the offending path back to the caller.
     pub fn public_message(&self) -> &'static str {
         match self {
             PathError::ProtocolUrl | PathError::OutsideRoot => "path not permitted",

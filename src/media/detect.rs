@@ -64,7 +64,7 @@ pub async fn detect_with_hw(path: &str, hw: &HwEncoder) -> Result<MediaProfile, 
         return Ok(MediaProfile {
             kind: MediaKind::ImageAnimated, codec_name: video_codec, duration_secs,
             size_bytes, width, height,
-            ffmpeg_args: s(&["-c:v","libx264","-preset","fast","-crf","28","-an","-movflags","+faststart"]), // animated gif/webp — no audio, sw only
+            ffmpeg_args: s(&["-c:v","libx264","-preset","fast","-crf","28","-an","-movflags","+faststart"]), // animated gif/webp - no audio, sw only
             output_ext: ext.into(),
             available_formats: vec!["gif".into(), "webp".into(), "mp4".into()],
             estimated_output_mb: size_mb * 0.15,
