@@ -81,43 +81,39 @@ export default function LiveStream() {
   }
 
   return (
-    <div style={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 12, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: "#ffffff" }}>Live Stream</span>
-          <span style={{ fontSize: 12, color: "#71717a" }}>Record your screen and compress in real-time</span>
-        </div>
+    <div className="ud-card">
+      <div className="ud-card-header">
+        <span className="ud-title">Live Stream</span>
+        <span className="ud-subtitle">Record your screen and compress in real-time</span>
         {streamState === "live" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444" }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", fontVariantNumeric: "tabular-nums" }}>LIVE {fmt(elapsed)}</span>
+          <div className="ud-live-badge">
+            <span className="ud-rec-dot" />
+            <span className="ud-live-timer">LIVE {fmt(elapsed)}</span>
           </div>
         )}
       </div>
 
-      <div style={{ display: "flex", gap: 10 }}>
+      <div className="ud-input-row">
         {streamState === "idle" && (
-          <Button variant="primary" onClick={startStream} style={{ flex: 1 }}>Go Live</Button>
+          <Button variant="primary" onClick={startStream} className="fc-btn-full">Go Live</Button>
         )}
         {streamState === "connecting" && (
-          <div style={{ flex: 1, padding: "10px", textAlign: "center", fontSize: 13, color: "#a1a1aa" }}>Connecting...</div>
+          <div className="ud-processing">Connecting...</div>
         )}
         {streamState === "live" && (
-          <button onClick={stopStream} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #ef4444", background: "#ef444422", color: "#ef4444", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-            End Stream
-          </button>
+          <button onClick={stopStream} className="ud-stop-btn">End Stream</button>
         )}
         {streamState === "done" && jobId && (
-          <Button variant="primary" onClick={() => downloadFile(jobId, "stream.webm")} style={{ flex: 1 }}>
+          <Button variant="primary" onClick={() => downloadFile(jobId, "stream.webm")} className="fc-btn-full">
             Download Recording
           </Button>
         )}
         {streamState === "done" && !jobId && (
-          <div style={{ flex: 1, fontSize: 12, color: "#71717a", padding: "10px" }}>No recording captured.</div>
+          <div className="ud-hint">No recording captured.</div>
         )}
       </div>
 
-      <div style={{ fontSize: 11, color: "#52525b" }}>
+      <div className="ud-hint">
         Your recording will be available to download when you end the session.
       </div>
     </div>

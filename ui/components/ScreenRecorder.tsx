@@ -94,39 +94,31 @@ export default function ScreenRecorder() {
   }
 
   return (
-    <div style={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 12, padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: "#ffffff" }}>Screen Recorder</span>
-          <span style={{ fontSize: 12, color: "#71717a" }}>Capture your screen and compress it</span>
-        </div>
+    <div className="ud-card">
+      <div className="ud-card-header">
+        <span className="ud-title">Screen Recorder</span>
+        <span className="ud-subtitle">Capture your screen and compress it</span>
         {state === "recording" && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#ef4444", animation: "pulse 1s infinite" }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: "#ef4444", fontVariantNumeric: "tabular-nums" }}>{fmt(elapsed)}</span>
+          <div className="ud-live-badge">
+            <span className="ud-rec-dot" />
+            <span className="ud-live-timer">{fmt(elapsed)}</span>
           </div>
         )}
       </div>
 
-      <div style={{ display: "flex", gap: 10 }}>
+      <div className="ud-input-row">
         {state === "idle" && (
-          <Button variant="primary" onClick={startRecording} style={{ flex: 1 }}>
-            Start Recording
-          </Button>
+          <Button variant="primary" onClick={startRecording} className="fc-btn-full">Start Recording</Button>
         )}
         {state === "recording" && (
-          <button onClick={stopRecording} style={{ flex: 1, padding: "10px", borderRadius: 8, border: "1px solid #ef4444", background: "#ef444422", color: "#ef4444", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-            Stop & Theflate
-          </button>
+          <button onClick={stopRecording} className="ud-stop-btn">Stop &amp; Theflate</button>
         )}
         {state === "processing" && (
-          <div style={{ flex: 1, padding: "10px", textAlign: "center", fontSize: 13, color: "#a1a1aa" }}>
-            Processing...
-          </div>
+          <div className="ud-processing">Processing...</div>
         )}
       </div>
 
-      <div style={{ fontSize: 11, color: "#52525b" }}>
+      <div className="ud-hint">
         Browser will prompt you to choose a screen, window, or tab. Microphone audio is included if permitted.
       </div>
     </div>

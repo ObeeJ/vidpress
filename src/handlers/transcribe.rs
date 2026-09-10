@@ -10,10 +10,8 @@ pub async fn transcribe(req: Request) -> Response {
     let State(state) = State::<AppState>::from_request(&req).unwrap();
     let caller = match auth_and_rate(&req, &state.db) { Ok(c) => c, Err(r) => return r };
 
-    // --- BILLING / TIERED PLAN MODEL SELECTION ---
-    // Previously: premium plan required for "medium" model.
-    // Commented/overridden to grant all users free access to the top-tier model.
-    // let model = if caller.as_ref().map(|k| k.plan == "premium").unwrap_or(false) { "large-v3" } else { "base" };
+    // No paid tiers are live yet, so every caller gets the best model.
+    // Revisit once payment verification exists.
     let model = "large-v3";
 
     let body: serde_json::Value = match serde_json::from_slice(&req.body) {
@@ -82,30 +80,41 @@ async fn run_transcription(
 
     let out_dir = storage_dir();
     let out_file = format!("{}/{}_transcript.json", out_dir, tid);
+    let stem = std::path::Path::new(&path).file_stem().and_then(|s| s.to_str()).unwrap_or("output");
+    let out_stem = format!("{}/{}", out_dir, stem);
 
-    // whisper-ctranslate2 (CTranslate2 / faster-whisper backend) instead of
-    // the reference openai-whisper CLI: int8-quantized large-v3 gets the
-    // full-size model's transcription quality at a fraction of the disk
-    // footprint and with meaningfully faster inference, so it can be baked
-    // into the deploy image (see Dockerfile) instead of downloaded at
-    // request time. Verified as a real drop-in, not assumed: same CLI shape
-    // (--model, --output_format json, --output_dir), same output JSON shape
-    // ({"text", "segments", "language"}) this handler already parses below.
-    let whisper_result = Command::new("whisper-ctranslate2")
-        .args([&path, "--model", &model, "--compute_type", "int8", "--output_format", "json", "--output_dir", &out_dir])
-        .kill_on_drop(true)
-        .output().await;
+    let default_model_path = std::env::var("WHISPER_MODEL_PATH").unwrap_or_else(|_| "/app/models/ggml-base.bin".to_string());
+    
+    // Try whisper-cli (whisper.cpp native engine) first, fallback to whisper-ctranslate2
+    let is_whisper_cli = Command::new("whisper-cli").arg("--help").output().await.is_ok();
+    
+    let whisper_result = if is_whisper_cli {
+        Command::new("whisper-cli")
+            .args(["-m", &default_model_path, "-f", &path, "-oj", "-of", &out_stem])
+            .kill_on_drop(true)
+            .output().await
+    } else {
+        Command::new("whisper-ctranslate2")
+            .args([&path, "--model", &model, "--compute_type", "int8", "--output_format", "json", "--output_dir", &out_dir])
+            .kill_on_drop(true)
+            .output().await
+    };
 
     match whisper_result {
         Ok(o) if o.status.success() => {
-            let stem = std::path::Path::new(&path).file_stem().and_then(|s| s.to_str()).unwrap_or("output");
             let whisper_out = format!("{}/{}.json", out_dir, stem);
             let raw = tokio::fs::read_to_string(&whisper_out).await
                 .unwrap_or_else(|_| String::from_utf8_lossy(&o.stdout).into_owned());
-            let text = serde_json::from_str::<serde_json::Value>(&raw)
-                .ok()
+            let parsed: Option<serde_json::Value> = serde_json::from_str(&raw).ok();
+            let text = parsed.as_ref()
                 .and_then(|v| v["text"].as_str().map(|s| s.to_string()))
+                .or_else(|| {
+                    parsed.as_ref().and_then(|v| v["transcription"].as_array()).map(|arr| {
+                        arr.iter().filter_map(|seg| seg["text"].as_str()).collect::<Vec<_>>().join(" ")
+                    })
+                })
                 .unwrap_or(raw);
+
             {
                 let conn = db.lock().unwrap_or_else(|e| e.into_inner());
                 conn.execute(
@@ -116,8 +125,6 @@ async fn run_transcription(
             let _ = tokio::fs::rename(&whisper_out, &out_file).await;
         }
         Ok(o) => {
-            // Never return raw whisper/python stderr to a client — it can
-            // contain server filesystem paths. Log server-side only.
             tracing::error!("whisper failed for transcription {tid} (exit {:?}):\n{}", o.status.code(), String::from_utf8_lossy(&o.stderr));
             let conn = db.lock().unwrap_or_else(|e| e.into_inner());
             conn.execute("UPDATE transcriptions SET status='failed' WHERE id=?1", params![tid]).ok();

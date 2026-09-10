@@ -21,7 +21,10 @@ pub async fn create_key(req: Request) -> Response {
         Err(_) => return json_err(400, "invalid json"),
     };
     let name      = body["name"].as_str().unwrap_or("unnamed").to_string();
-    let plan      = "free";
+    let plan      = match body["plan"].as_str().unwrap_or("free") {
+        p @ ("free" | "premium" | "api_starter" | "api_growth" | "api_scale" | "white_label") => p,
+        _ => "free",
+    };
     let webhook   = body["webhook_url"].as_str().map(String::from);
     let wl_domain = body["white_label_domain"].as_str().map(String::from);
     let wl_brand  = body["white_label_brand"].as_str().map(String::from);

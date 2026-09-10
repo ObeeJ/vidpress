@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { API, downloadFile } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import Button from "@/components/primitives/Button";
@@ -11,9 +11,15 @@ export default function UrlDownloader() {
   const [jobId, setJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clear interval on unmount so it never fires against an unmounted component.
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
 
   async function submit() {
     if (!url.trim()) return;
+    // Clear any previous poll before starting a new one.
+    if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
     setLoading(true);
     setJobId(null);
     setStatus(null);
@@ -29,14 +35,19 @@ export default function UrlDownloader() {
       setStatus("queued");
       toast("Download started", "info");
 
-      const poll = setInterval(async () => {
+      pollRef.current = setInterval(async () => {
         try {
           const jr = await fetch(`${API}/jobs/${data.job_id}`);
           const job = await jr.json();
           setStatus(job.status);
-          if (job.status === "done") { clearInterval(poll); toast("Ready to download", "success"); }
-          if (job.status === "failed") { clearInterval(poll); toast("Download failed", "error"); }
-        } catch { clearInterval(poll); }
+          if (job.status === "done" || job.status === "failed") {
+            if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+            if (job.status === "done") toast("Ready to download", "success");
+            else toast("Download failed", "error");
+          }
+        } catch {
+          if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null; }
+        }
       }, 1500);
     } catch (e: unknown) {
       toast(String(e), "error");
@@ -46,70 +57,59 @@ export default function UrlDownloader() {
   }
 
   return (
-    <div style={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 12, padding: "20px", display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="ud-card">
       <div>
-        <h3 style={{ fontSize: 15, fontWeight: 700, color: "#ffffff" }}>Download from URL</h3>
-        <p style={{ fontSize: 12, color: "#a1a1aa" }}>Paste a link from YouTube, Instagram, TikTok, X (Twitter), or Facebook</p>
+        <h3 className="ud-title">Download from URL</h3>
+        <p className="ud-subtitle">Paste a link from YouTube, Instagram, TikTok, X (Twitter), or Facebook</p>
       </div>
 
-      <div style={{ display: "flex", gap: 8 }}>
+      <div className="ud-input-row">
         <input
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && submit()}
           placeholder="https://youtu.be/... or https://x.com/..."
-          style={{ flex: 1, padding: "10px 14px", borderRadius: 9999, border: "1px solid #27272a", background: "#000000", color: "#ffffff", fontSize: 13, outline: "none" }}
+          className="ud-input"
         />
-        <Button
-          variant="primary"
-          onClick={submit}
-          disabled={loading || !url.trim()}
-          style={{ padding: "8px 18px", whiteSpace: "nowrap" }}
-        >
+        <Button variant="primary" onClick={submit} disabled={loading || !url.trim()}>
           {loading ? "Fetching..." : audioOnly ? "Extract Audio" : "Fetch Media"}
         </Button>
       </div>
 
-      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#a1a1aa", cursor: "pointer", userSelect: "none" }}>
+      <label className="ud-checkbox-label">
         <input
           type="checkbox"
           checked={audioOnly}
           onChange={(e) => setAudioOnly(e.target.checked)}
-          style={{ accentColor: "#ffffff", width: 15, height: 15 }}
+          className="ud-checkbox"
         />
         Audio only (MP3)
       </label>
 
       {status && status !== "done" && status !== "failed" && (
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: 8, background: "#121215", border: "1px solid #27272a", fontSize: 13, color: "#f4f4f5" }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#10b981" }} />
-          <span><strong style={{ color: "#ffffff", textTransform: "capitalize" }}>{status}</strong>: Downloading...</span>
+        <div className="ud-status">
+          <span className="ud-status-dot" />
+          <span><strong className="ud-status-label">{status}</strong>: Downloading...</span>
         </div>
       )}
 
       {status === "done" && jobId && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 12, borderTop: "1px solid #18181b", paddingTop: 14 }}>
-          <div style={{ borderRadius: 8, overflow: "hidden", background: "#000000", border: "1px solid #27272a" }}>
+        <div className="ud-result">
+          <div className="ud-media-frame">
             {audioOnly ? (
-              <audio src={`${API}/download/${jobId}`} controls crossOrigin="anonymous" style={{ width: "100%", padding: 12, display: "block" }} />
+              <audio src={`${API}/download/${jobId}`} controls crossOrigin="anonymous" className="ud-audio" />
             ) : (
-              <video src={`${API}/download/${jobId}`} controls playsInline crossOrigin="anonymous" style={{ width: "100%", maxHeight: 320, display: "block" }} />
+              <video src={`${API}/download/${jobId}`} controls playsInline crossOrigin="anonymous" className="ud-video" />
             )}
           </div>
-          <Button
-            variant="primary"
-            onClick={() => downloadFile(jobId, audioOnly ? "audio.mp3" : "video.mp4")}
-            style={{ width: "100%" }}
-          >
+          <Button variant="primary" onClick={() => downloadFile(jobId, audioOnly ? "audio.mp3" : "video.mp4")} className="fc-btn-full">
             Download {audioOnly ? "MP3" : "MP4"}
           </Button>
         </div>
       )}
 
       {status === "failed" && (
-        <div style={{ fontSize: 12, color: "#ef4444", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", padding: "10px 14px", borderRadius: 8 }}>
-          Download failed. Check the URL and try again.
-        </div>
+        <div className="fc-error">Download failed. Check the URL and try again.</div>
       )}
     </div>
   );

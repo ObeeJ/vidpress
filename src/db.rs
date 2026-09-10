@@ -83,7 +83,21 @@ pub fn init_db(conn: &Connection) {
 
 pub fn upsert_job(db: &Db, job: &Job) {
     let conn = db.lock().unwrap_or_else(|e| e.into_inner());
-    let dest_json = job.destination.as_ref().and_then(|d| serde_json::to_string(d).ok());
+    // Strip secret credentials before persisting. Non-secret metadata
+    // (provider, bucket, endpoint, region, target_path) is kept so the job
+    // record retains display/audit context. Credentials must be supplied
+    // fresh at export time via POST /export — never read back from the DB.
+    // Wire safety is separately guaranteed by PublicJob which strips
+    // destination entirely.
+    let dest_json = job.destination.as_ref().and_then(|d| {
+        serde_json::to_string(&serde_json::json!({
+            "provider":    d.provider,
+            "bucket":      d.bucket,
+            "endpoint":    d.endpoint,
+            "region":      d.region,
+            "target_path": d.target_path,
+        })).ok()
+    });
     if let Err(e) = conn.execute(
         "INSERT INTO jobs
          (id,status,media_kind,input_path,output_path,original_bytes,compressed_bytes,
@@ -168,51 +182,20 @@ pub fn get_job_for(db: &Db, id: &str, caller: Option<&str>) -> Option<Job> {
         map_job_row,
     ) {
         Ok(job) => Some(job),
+        Err(rusqlite::Error::QueryReturnedNoRows) => None,
         Err(e) => {
-            tracing::error!("get_job_for failed for id={id}, caller={caller:?}: {e}");
+            tracing::warn!("get_job_for failed for id={id}, caller={caller:?}: {e}");
             None
         }
     }
 }
 
 pub fn load_all_jobs(conn: &Connection) -> Vec<Job> {
-    let mut stmt = match conn.prepare(&format!("{JOB_SELECT}")) {
+    let mut stmt = match conn.prepare(JOB_SELECT) {
         Ok(s) => s,
         Err(e) => { tracing::error!("load_all_jobs prepare failed: {e}"); return vec![]; }
     };
-    let rows = match stmt.query_map([], |row| {
-        let status_str: String = row.get(1)?;
-        let kind_str: String = row.get(2)?;
-        let dest_json: Option<String> = row.get(12)?;
-        Ok(Job {
-            id: row.get(0)?,
-            status: match status_str.as_str() {
-                "processing" => JobStatus::Failed,
-                "done"       => JobStatus::Done,
-                "failed"     => JobStatus::Failed,
-                _            => JobStatus::Queued,
-            },
-            media_kind: match kind_str.as_str() {
-                "audio_lossless" => MediaKind::AudioLossless,
-                "audio_lossy"    => MediaKind::AudioLossy,
-                "image_animated" => MediaKind::ImageAnimated,
-                "image_static"   => MediaKind::ImageStatic,
-                _                => MediaKind::Video,
-            },
-            input_path:       row.get(3)?,
-            output_path:      row.get(4)?,
-            original_bytes:   row.get::<_, i64>(5)? as u64,
-            compressed_bytes: row.get::<_, i64>(6)? as u64,
-            duration_secs:    row.get(7)?,
-            progress:         row.get::<_, i64>(8)? as u8,
-            eta_secs:         row.get::<_, i64>(9)? as u64,
-            webhook_url:      row.get(10)?,
-            preset:           row.get(11)?,
-            destination:      dest_json.and_then(|j| serde_json::from_str(&j).ok()),
-            remote_url:       row.get(13)?,
-            owner_key:        row.get(14)?,
-        })
-    }) {
+    let rows: Vec<Job> = match stmt.query_map([], map_job_row) {
         Ok(r) => r.flatten().collect(),
         Err(e) => { tracing::error!("load_all_jobs query failed: {e}"); vec![] }
     };

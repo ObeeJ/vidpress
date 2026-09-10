@@ -167,12 +167,17 @@ fn regression_public_job_never_carries_destination_credentials() {
     assert!(!wire.contains("AKIAEXAMPLE"));
     assert!(!wire.contains("/srv/out/"), "server paths must not reach clients");
 
-    // ...while persistence keeps them, so export can still work later.
+    // ...while persistence keeps non-secret fields and strips secret keys.
     let reloaded = get_job(&db, id).expect("job row");
     assert_eq!(
-        reloaded.destination.and_then(|d| d.secret_key).as_deref(),
-        Some("SUPER-SECRET-VALUE"),
-        "credentials must survive the round trip through destination_json"
+        reloaded.destination.as_ref().and_then(|d| d.bucket.as_deref()),
+        Some("example-bucket"),
+        "non-secret destination metadata must survive persistence"
+    );
+    assert_eq!(
+        reloaded.destination.as_ref().and_then(|d| d.secret_key.as_deref()),
+        None,
+        "secret credentials must be stripped from database storage"
     );
 }
 

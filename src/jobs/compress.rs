@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::Duration;
 use tokio::process::Command;
 use crate::{
@@ -11,6 +12,27 @@ use crate::{
 
 fn num_cpus() -> String {
     std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2).to_string()
+}
+
+fn target_mb_codec() -> &'static str {
+    match std::env::var("THEFLATE_CODEC").as_deref() {
+        Ok("h264") | Ok("libx264") => "libx264",
+        _ => "libx265",
+    }
+}
+
+async fn cleanup_passlog_files(id: &str) {
+    let dir = crate::state::storage_dir();
+    let prefix = format!("{id}_passlog");
+    if let Ok(mut entries) = tokio::fs::read_dir(&dir).await {
+        while let Ok(Some(entry)) = entries.next_entry().await {
+            if let Some(name) = entry.file_name().to_str() {
+                if name.starts_with(&prefix) {
+                    let _ = tokio::fs::remove_file(entry.path()).await;
+                }
+            }
+        }
+    }
 }
 
 pub async fn run(
@@ -34,92 +56,52 @@ pub async fn run(
         }
     };
 
-    update(JobStatus::Processing, 0, profile.estimated_time_secs, 0);
+    let is_two_pass = target_mb.filter(|_| preset.is_none()).is_some()
+        && (profile.kind == MediaKind::Video || profile.kind == MediaKind::ImageAnimated)
+        && hw != HwEncoder::Nvenc;
+
+    let initial_eta = if is_two_pass {
+        profile.estimated_time_secs * 2
+    } else {
+        profile.estimated_time_secs
+    };
+
+    update(JobStatus::Processing, 0, initial_eta, 0);
 
     let progress_file = format!("{}/{id}_progress", crate::state::storage_dir());
     let duration = profile.duration_secs;
-    let ffmpeg_args = if profile.kind == MediaKind::AudioLossy || profile.kind == MediaKind::AudioLossless {
-        if let Some(mb) = target_mb {
-            let audio_kbps = (((mb * 8.0 * 1024.0) / profile.duration_secs.max(1.0)) as u64).clamp(32, 320);
-            vec!["-c:a".into(), "aac".into(), "-b:a".into(), format!("{audio_kbps}k"), "-vn".into()]
-        } else {
-            profile.ffmpeg_args.clone()
-        }
-    } else if let Some(mb) = target_mb.filter(|_| preset.is_none()) {
-        // Cap target_mb to prevent absurd bitrates that fill the disk. (M11)
-        const MAX_TARGET_MB: f64 = 10_240.0;
-        let mb = mb.clamp(0.1, MAX_TARGET_MB);
-        // Convert target MB to a video bitrate, reserving 128k for audio
-        let total_kbps = ((mb * 8.0 * 1024.0) / profile.duration_secs.max(1.0)) as u64;
-        let video_kbps = total_kbps.saturating_sub(128).max(100);
-        match &hw {
-            HwEncoder::Nvenc => vec![
-                "-c:v".into(), "h264_nvenc".into(), "-preset".into(), "p1".into(),
-                "-b:v".into(), format!("{video_kbps}k"),
-                "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
-                "-movflags".into(), "+faststart".into(),
-            ],
-            // No -rc_mode here on purpose: a target file size needs
-            // bitrate-based rate control (VBR/CBR), but this is the one
-            // VAAPI path that can't just add -rc_mode CQP like the others
-            // (media/ffmpeg_args.rs) - CQP is constant-*quality*, not
-            // constant-bitrate, so it has no bitrate target to give -b:v at
-            // all. A driver that only advertises CQP support (common on
-            // several VAAPI stacks) rejects this combination outright with
-            // "Driver does not support any RC mode compatible with selected
-            // options" - not a flag we forgot, a capability the hardware
-            // path doesn't have. Fall back to software, which does.
-            HwEncoder::Vaapi => vec![
-                "-c:v".into(), "libx264".into(), "-preset".into(), "ultrafast".into(),
-                "-b:v".into(), format!("{video_kbps}k"),
-                "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
-                "-movflags".into(), "+faststart".into(),
-            ],
-            HwEncoder::Software => vec![
-                "-c:v".into(), "libx264".into(), "-preset".into(), "ultrafast".into(),
-                "-b:v".into(), format!("{video_kbps}k"),
-                "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
-                "-movflags".into(), "+faststart".into(),
-            ],
-        }
-    } else {
-        preset_ffmpeg_args(&preset, &hw).unwrap_or(profile.ffmpeg_args.clone())
-    };
-
-    let mut args: Vec<String> = vec!["-y".into(), "-threads".into(), num_cpus(), "-i".into(), input];
-    args.extend(ffmpeg_args);
-    if duration > 0.1 {
-        args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
-    }
-    args.push(output.clone());
-
-    let child = match Command::new("ffmpeg").args(&args)
-        .env("OMP_NUM_THREADS", num_cpus())
-        .stderr(std::process::Stdio::piped()).spawn()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::error!("ffmpeg spawn failed: {e}");
-            update(JobStatus::Failed, 0, 0, 0);
-            return;
-        }
-    };
+    let current_pass = std::sync::Arc::new(AtomicU8::new(1));
 
     // Progress polling task
     let jobs_p = jobs.clone();
     let db_p = db.clone();
     let id_p = id.clone();
     let pf = progress_file.clone();
+    let current_pass_task = current_pass.clone();
     let progress_task = tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_millis(500)).await;
             if let Ok(content) = tokio::fs::read_to_string(&pf).await {
                 if let Some(us) = parse_out_time_us(&content) {
                     let elapsed = us as f64 / 1_000_000.0;
-                    let pct = ((elapsed / duration) * 100.0).min(99.0) as u8;
-                    let eta = if pct > 0 {
-                        ((elapsed / (pct as f64 / 100.0)) - elapsed) as u64
-                    } else { 0 };
+                    let pass = current_pass_task.load(Ordering::Relaxed);
+                    let (pct, eta) = if is_two_pass {
+                        if pass == 1 {
+                            let p = ((elapsed / duration.max(0.1)) * 50.0).min(49.0) as u8;
+                            let rem = (2.0 * duration - elapsed).max(0.0) as u64;
+                            (p, rem)
+                        } else {
+                            let p = (50.0 + (elapsed / duration.max(0.1)) * 50.0).min(99.0) as u8;
+                            let rem = (duration - elapsed).max(0.0) as u64;
+                            (p, rem)
+                        }
+                    } else {
+                        let p = ((elapsed / duration.max(0.1)) * 100.0).min(99.0) as u8;
+                        let rem = if p > 0 {
+                            ((elapsed / (p as f64 / 100.0)) - elapsed) as u64
+                        } else { 0 };
+                        (p, rem)
+                    };
                     let mut s = jobs_p.lock().unwrap();
                     if let Some(job) = s.get_mut(&id_p) {
                         job.progress = pct;
@@ -133,40 +115,257 @@ pub async fn run(
         }
     });
 
-    let result = child.wait_with_output().await;
+    let result = if is_two_pass {
+        let mb = target_mb.unwrap();
+        const MAX_TARGET_MB: f64 = 10_240.0;
+        let mb = mb.clamp(0.1, MAX_TARGET_MB);
+        let total_kbps = ((mb * 8.0 * 1024.0) / profile.duration_secs.max(1.0)) as u64;
+        let video_kbps = total_kbps.saturating_sub(128).max(100);
+
+        const MIN_BITS_PER_PIXEL: f64 = 0.02;
+        const ASSUMED_FPS: f64 = 30.0;
+        let scale_filter = match (profile.width, profile.height) {
+            (Some(w), Some(h)) if w > 0 && h > 0 => {
+                let bits_per_pixel = (video_kbps as f64 * 1000.0) / (w as f64 * h as f64 * ASSUMED_FPS);
+                if bits_per_pixel < MIN_BITS_PER_PIXEL {
+                    let scale_factor = (bits_per_pixel / MIN_BITS_PER_PIXEL).sqrt();
+                    let target_h = ((h as f64 * scale_factor) as u64).clamp(144, h).next_multiple_of(2);
+                    Some(format!("scale=-2:{target_h}"))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        let codec = target_mb_codec();
+        let passlogfile = format!("{}/{id}_passlog", crate::state::storage_dir());
+        let null_output = if cfg!(windows) { "NUL" } else { "/dev/null" };
+
+        let mut pass1_args: Vec<String> = vec![
+            "-y".into(), "-threads".into(), num_cpus(), "-i".into(), input.clone(),
+            "-c:v".into(), codec.into(), "-preset".into(), "medium".into(),
+            "-b:v".into(), format!("{video_kbps}k"),
+        ];
+        if let Some(ref f) = scale_filter {
+            pass1_args.push("-vf".into());
+            pass1_args.push(f.clone());
+        }
+        pass1_args.extend([
+            "-pass".into(), "1".into(), "-passlogfile".into(), passlogfile.clone(),
+        ]);
+        if duration > 0.1 {
+            pass1_args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
+        }
+        pass1_args.extend(["-an".into(), "-f".into(), "null".into(), null_output.into()]);
+
+        current_pass.store(1, Ordering::Relaxed);
+        let child1 = Command::new("ffmpeg").args(&pass1_args)
+            .env("OMP_NUM_THREADS", num_cpus())
+            .stderr(std::process::Stdio::piped()).spawn();
+
+        let res1 = match child1 {
+            Ok(c) => c.wait_with_output().await,
+            Err(e) => {
+                tracing::error!("ffmpeg pass 1 spawn failed: {e}");
+                progress_task.abort();
+                let _ = tokio::fs::remove_file(&progress_file).await;
+                cleanup_passlog_files(&id).await;
+                update(JobStatus::Failed, 0, 0, 0);
+                jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
+                return;
+            }
+        };
+
+        if let Ok(ref out) = res1 {
+            if !out.status.success() {
+                tracing::error!("ffmpeg pass 1 failed:\n{}", String::from_utf8_lossy(&out.stderr));
+                progress_task.abort();
+                let _ = tokio::fs::remove_file(&progress_file).await;
+                cleanup_passlog_files(&id).await;
+                update(JobStatus::Failed, 0, 0, 0);
+                jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
+                return;
+            }
+        } else if let Err(ref e) = res1 {
+            tracing::error!("ffmpeg pass 1 wait failed: {e}");
+            progress_task.abort();
+            let _ = tokio::fs::remove_file(&progress_file).await;
+            cleanup_passlog_files(&id).await;
+            update(JobStatus::Failed, 0, 0, 0);
+            jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
+            return;
+        }
+
+        // Clean up pass 1 progress file before starting pass 2
+        let _ = tokio::fs::remove_file(&progress_file).await;
+
+        let mut pass2_args: Vec<String> = vec![
+            "-y".into(), "-threads".into(), num_cpus(), "-i".into(), input.clone(),
+            "-c:v".into(), codec.into(), "-preset".into(), "medium".into(),
+            "-b:v".into(), format!("{video_kbps}k"),
+        ];
+        if let Some(ref f) = scale_filter {
+            pass2_args.push("-vf".into());
+            pass2_args.push(f.clone());
+        }
+        pass2_args.extend([
+            "-pass".into(), "2".into(), "-passlogfile".into(), passlogfile.clone(),
+            "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
+            "-movflags".into(), "+faststart".into(),
+        ]);
+        if duration > 0.1 {
+            pass2_args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
+        }
+        pass2_args.push(output.clone());
+
+        current_pass.store(2, Ordering::Relaxed);
+        let child2 = Command::new("ffmpeg").args(&pass2_args)
+            .env("OMP_NUM_THREADS", num_cpus())
+            .stderr(std::process::Stdio::piped()).spawn();
+
+        match child2 {
+            Ok(c) => c.wait_with_output().await,
+            Err(e) => {
+                tracing::error!("ffmpeg pass 2 spawn failed: {e}");
+                progress_task.abort();
+                let _ = tokio::fs::remove_file(&progress_file).await;
+                cleanup_passlog_files(&id).await;
+                update(JobStatus::Failed, 0, 0, 0);
+                jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
+                return;
+            }
+        }
+    } else {
+        // Single pass path (audio, preset video, default video, NVENC target_mb)
+        let ffmpeg_args = if profile.kind == MediaKind::AudioLossy || profile.kind == MediaKind::AudioLossless {
+            if let Some(mb) = target_mb {
+                let audio_kbps = (((mb * 8.0 * 1024.0) / profile.duration_secs.max(1.0)) as u64).clamp(32, 320);
+                vec!["-c:a".into(), "aac".into(), "-b:a".into(), format!("{audio_kbps}k"), "-vn".into()]
+            } else {
+                profile.ffmpeg_args.clone()
+            }
+        } else if let Some(mb) = target_mb.filter(|_| preset.is_none()) {
+            const MAX_TARGET_MB: f64 = 10_240.0;
+            let mb = mb.clamp(0.1, MAX_TARGET_MB);
+            let total_kbps = ((mb * 8.0 * 1024.0) / profile.duration_secs.max(1.0)) as u64;
+            let video_kbps = total_kbps.saturating_sub(128).max(100);
+
+            const MIN_BITS_PER_PIXEL: f64 = 0.02;
+            const ASSUMED_FPS: f64 = 30.0;
+            let scale_filter = match (profile.width, profile.height) {
+                (Some(w), Some(h)) if w > 0 && h > 0 => {
+                    let bits_per_pixel = (video_kbps as f64 * 1000.0) / (w as f64 * h as f64 * ASSUMED_FPS);
+                    if bits_per_pixel < MIN_BITS_PER_PIXEL {
+                        let scale_factor = (bits_per_pixel / MIN_BITS_PER_PIXEL).sqrt();
+                        let target_h = ((h as f64 * scale_factor) as u64).clamp(144, h).next_multiple_of(2);
+                        Some(format!("scale=-2:{target_h}"))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+            let with_scale = |mut args: Vec<String>| {
+                if let Some(ref f) = scale_filter {
+                    args.push("-vf".into());
+                    args.push(f.clone());
+                }
+                args
+            };
+
+            match &hw {
+                HwEncoder::Nvenc => with_scale(vec![
+                    "-c:v".into(), "h264_nvenc".into(), "-preset".into(), "p1".into(),
+                    "-b:v".into(), format!("{video_kbps}k"),
+                    "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
+                    "-movflags".into(), "+faststart".into(),
+                ]),
+                // Reached by MediaKind::ImageStatic target_mb jobs, which
+                // is_two_pass excludes (two-pass only applies to Video and
+                // ImageAnimated). Vaapi and Software fall back to the same
+                // single-pass ultrafast libx264 encode used before two-pass
+                // existed, rather than panicking.
+                HwEncoder::Vaapi | HwEncoder::Software => with_scale(vec![
+                    "-c:v".into(), "libx264".into(), "-preset".into(), "ultrafast".into(),
+                    "-b:v".into(), format!("{video_kbps}k"),
+                    "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
+                    "-movflags".into(), "+faststart".into(),
+                ]),
+            }
+        } else {
+            preset_ffmpeg_args(&preset, &hw).unwrap_or(profile.ffmpeg_args.clone())
+        };
+
+        let mut args: Vec<String> = vec!["-y".into(), "-threads".into(), num_cpus(), "-i".into(), input];
+        args.extend(ffmpeg_args);
+        if duration > 0.1 {
+            args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
+        }
+        args.push(output.clone());
+
+        let child = match Command::new("ffmpeg").args(&args)
+            .env("OMP_NUM_THREADS", num_cpus())
+            .stderr(std::process::Stdio::piped()).spawn()
+        {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::error!("ffmpeg spawn failed: {e}");
+                update(JobStatus::Failed, 0, 0, 0);
+                return;
+            }
+        };
+
+        child.wait_with_output().await
+    };
+
     progress_task.abort();
     let _ = tokio::fs::remove_file(&progress_file).await;
+    if is_two_pass {
+        cleanup_passlog_files(&id).await;
+    }
 
     match result {
         Ok(out) if out.status.success() => {
             let compressed_bytes = std::fs::metadata(&output).map(|m| m.len()).unwrap_or(0);
-            let mut store = jobs.lock().unwrap();
-            if let Some(job) = store.get_mut(&id) {
-                job.status = JobStatus::Done;
-                job.compressed_bytes = compressed_bytes;
-                job.progress = 100;
-                job.eta_secs = 0;
-                if let Some(ref dest) = job.destination.clone() {
-                    let output_path = job.output_path.clone();
+            // LOCK ORDER INVARIANT: always acquire `jobs` before `db`.
+            // Clone the job and drop `jobs` before calling upsert_job (which
+            // acquires `db`). Inverting this order anywhere would deadlock.
+            let job_clone = {
+                let mut store = jobs.lock().unwrap();
+                if let Some(job) = store.get_mut(&id) {
+                    job.status = JobStatus::Done;
+                    job.compressed_bytes = compressed_bytes;
+                    job.progress = 100;
+                    job.eta_secs = 0;
+                }
+                store.get(&id).cloned()
+            };
+            if let Some(job_clone) = job_clone {
+                upsert_job(&db, &job_clone);
+                if let Some(ref dest) = job_clone.destination {
+                    let output_path = job_clone.output_path.clone();
                     let dest = dest.clone();
-                    let job_id = job.id.clone();
+                    let job_id = job_clone.id.clone();
                     let db2 = db.clone();
                     let jobs2 = jobs.clone();
                     tokio::spawn(async move {
                         match crate::export::s3::upload(&dest, &output_path).await {
                             Ok(url) => {
-                                if let Some(j) = jobs2.lock().unwrap().get_mut(&job_id) {
-                                    j.remote_url = Some(url);
-                                    upsert_job(&db2, j);
-                                }
+                                // LOCK ORDER INVARIANT: jobs before db.
+                                let updated = {
+                                    let mut s = jobs2.lock().unwrap();
+                                    if let Some(j) = s.get_mut(&job_id) {
+                                        j.remote_url = Some(url);
+                                        Some(j.clone())
+                                    } else { None }
+                                };
+                                if let Some(j) = updated { upsert_job(&db2, &j); }
                             }
                             Err(e) => tracing::error!("auto-export failed for {job_id}: {e}"),
                         }
                     });
                 }
-                let job_clone = job.clone();
-                drop(store);
-                upsert_job(&db, &job_clone);
                 if let Some(url) = job_clone.webhook_url.clone() {
                     let payload = serde_json::to_string(&job_clone.public()).unwrap_or_default();
                     tokio::spawn(async move { webhook::deliver(&url, &payload).await; });

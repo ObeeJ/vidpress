@@ -14,18 +14,13 @@ const variantClass: Record<string, string> = {
   ghost:     "btn",
 };
 
-const sizeStyle: Record<string, React.CSSProperties> = {
-  sm: { padding: "0.375rem 0.75rem", fontSize: "var(--text-xs)" },
-  md: {},
-};
-
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = "secondary", size = "md", loading, disabled, children, style, ...props }, ref) => (
+  ({ variant = "secondary", size = "md", loading, disabled, children, className, style, ...props }, ref) => (
     <button
       ref={ref}
-      className={variantClass[variant]}
+      className={[variantClass[variant], size === "sm" ? "btn-sm" : "", className].filter(Boolean).join(" ")}
       disabled={disabled || loading}
-      style={{ ...sizeStyle[size], ...style }}
+      style={style}
       {...props}
     >
       {loading && <span className="track" style={{ width: 14, height: 14, borderRadius: "var(--radius-full)", display: "inline-block", marginRight: "var(--spacing-2)" }} />}

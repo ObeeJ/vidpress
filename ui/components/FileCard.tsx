@@ -133,6 +133,15 @@ export default function FileCard({ item }: { item: FileItem }) {
   const originalMb = profile ? profile.size_bytes / 1048576 : 0;
   const minMb = profile ? Math.max(0.01, +(originalMb * 0.01).toFixed(2)) : 0;
   const targetMb = item.targetMb ?? profile?.estimated_output_mb ?? 0;
+  // Mirrors MIN_BITS_PER_PIXEL in src/jobs/compress.rs::run — below this the
+  // backend scales resolution down to hit the target size, so warn here
+  // instead of letting it happen as a silent surprise.
+  const belowQualityFloor = (() => {
+    if (!profile?.width || !profile?.height || profile.duration_secs <= 0) return false;
+    const videoKbps = Math.max(100, ((targetMb * 8 * 1024) / profile.duration_secs) - 128);
+    const bitsPerPixel = (videoKbps * 1000) / (profile.width * profile.height * 30);
+    return bitsPerPixel < 0.02;
+  })();
   const savingPct = originalMb > 0 ? Math.round((1 - targetMb / originalMb) * 100) : 0;
   const downloadTimeSecs = networkMbps > 0 ? Math.ceil((targetMb * 8) / networkMbps) : 0;
   const costEstimate = targetMb ? `$${(targetMb * 0.01).toFixed(3)}` : "Free";
@@ -246,7 +255,7 @@ export default function FileCard({ item }: { item: FileItem }) {
                 className="fc-bar-fill"
                 style={{
                   width: item.ingestId ? "100%" : `${item.uploadPct ?? 0}%`,
-                  background: item.ingestId ? "#10b981" : "var(--color-fg)",
+                  background: item.ingestId ? "var(--color-signal)" : "var(--color-fg)",
                 }}
               />
             </div>
@@ -306,7 +315,19 @@ export default function FileCard({ item }: { item: FileItem }) {
         {profile && !job && selectedPreset === "original" && (
           <div className="fc-slider-row">
             <div className="fc-slider-header">
-              <span className="fc-progress-label fc-label-inline">Target file size</span>
+              <span className="fc-progress-label fc-label-inline">
+                Target file size
+                {belowQualityFloor && (
+                  <span className="fc-info-icon" tabIndex={0} aria-label="Quality notice">
+                    i
+                    <span className="fc-tooltip" role="tooltip">
+                      This size is smaller than the source resolution can cleanly support —
+                      we&apos;ll automatically reduce the resolution to hit it. You can still
+                      slide lower; quality will trade off further.
+                    </span>
+                  </span>
+                )}
+              </span>
               <div className="fc-slider-value">
                 <span className="fc-stat-value">{targetMb.toFixed(1)} MB</span>
                 <span className="fc-savings-badge">
@@ -355,7 +376,7 @@ export default function FileCard({ item }: { item: FileItem }) {
                 style={{
                   width: job.progress > 0 ? `${job.progress}%` : "100%",
                   background: "var(--color-fg)",
-                  transition: job.progress > 0 ? "width 0.4s ease" : "none",
+                  transition: job.progress > 0 ? `width var(--dur-3) var(--ease-out)` : "none",
                   animation: job.progress === 0 ? "theflate-pulse 1.5s ease-in-out infinite" : "none",
                 }}
               />
