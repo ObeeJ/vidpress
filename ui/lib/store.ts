@@ -59,6 +59,7 @@ interface Store {
   setNetworkMbps: (mbps: number) => void;
   addFileWithUrl: (file: File, localUrl: string) => void;
   removeFile: (localUrl: string) => void;
+  resetJob: (localUrl: string) => void;
 }
 
 export const useStore = create<Store>((set) => ({
@@ -114,4 +115,10 @@ export const useStore = create<Store>((set) => ({
     })),
   removeFile: (localUrl) =>
     set((s) => ({ files: s.files.filter((f) => f.localUrl !== localUrl) })),
+  resetJob: (localUrl) =>
+    set((s) => ({
+      files: s.files.map((f) =>
+        f.localUrl === localUrl ? { ...f, jobId: undefined, job: undefined } : f
+      ),
+    })),
 }));

@@ -73,7 +73,7 @@ const stat = (label: string, value: string, colorVar?: string) => (
 );
 
 export default function FileCard({ item }: { item: FileItem }) {
-  const { setProfile, setJobId, setJob, setError, removeFile, networkMbps } = useStore();
+  const { setProfile, setJobId, setJob, setError, removeFile, networkMbps, resetJob } = useStore();
   const setIngestId = useStore((s) => s.setIngestId);
   const setUploadPct = useStore((s) => s.setUploadPct);
   const setTargetMb = useStore((s) => s.setTargetMb);
@@ -300,6 +300,19 @@ export default function FileCard({ item }: { item: FileItem }) {
           </div>
         )}
 
+        {/* Source Preview */}
+        {profile && !job && item.localUrl && (
+          <div className="fc-media-frame">
+            {profile.kind === "video" || profile.kind === "image_animated" ? (
+              <video src={item.localUrl} controls muted />
+            ) : profile.kind?.includes("audio") ? (
+              <audio src={item.localUrl} controls />
+            ) : profile.kind === "image_static" ? (
+              <img src={item.localUrl} alt="preview" />
+            ) : null}
+          </div>
+        )}
+
         {/* Format Picker */}
         {profile && !job && profile.available_formats?.length > 0 && (
           <div className="fc-progress-row">
@@ -409,6 +422,15 @@ export default function FileCard({ item }: { item: FileItem }) {
                 }}
               />
             </div>
+          </div>
+        )}
+
+        {/* Failed State */}
+        {job?.status === "failed" && (
+          <div className="fc-actions">
+            <Button variant="secondary" onClick={() => resetJob(item.localUrl)}>
+              Try different settings
+            </Button>
           </div>
         )}
 
@@ -550,6 +572,9 @@ export default function FileCard({ item }: { item: FileItem }) {
             <div className="fc-actions">
               <Button variant="secondary" onClick={() => setShowQrModal(!showQrModal)}>
                 {showQrModal ? "Hide QR Code" : "QR Share"}
+              </Button>
+              <Button variant="secondary" onClick={() => resetJob(item.localUrl)}>
+                Re-compress
               </Button>
               {outputUrl && (
                 <Button
