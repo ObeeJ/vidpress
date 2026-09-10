@@ -30,11 +30,11 @@ export default function Home() {
         {/* Hero */}
         <div className="hero">
           <h1 className="display hero-title">
-            Deflate any file. Instantly.
+            Compress, convert,<br className="hero-br" /> share.
           </h1>
 
           <p className="lede">
-            Theflate video, audio, and images by up to 90% with zero visible quality loss. High-speed media processing for developers and creators.
+            Drop any video, audio, or image. Get a smaller file back in seconds — no account, no limits, no nonsense.
           </p>
         </div>
 

@@ -1,0 +1,10 @@
+import { chromium } from 'playwright';
+const browser = await chromium.launch();
+const page = await browser.newPage();
+await page.setViewportSize({ width: 375, height: 812 });
+await page.goto('http://localhost:3000', { waitUntil: 'networkidle' });
+await page.screenshot({ path: '/tmp/mobile-375.png', fullPage: true });
+await page.setViewportSize({ width: 1280, height: 800 });
+await page.screenshot({ path: '/tmp/desktop-1280.png' });
+await browser.close();
+console.log('done');

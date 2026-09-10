@@ -6,7 +6,7 @@ import Footer from "@/components/Footer";
 
 const BASE = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:8080";
 
-const MC: Record<string, string> = { GET: "#10b981", POST: "#ffffff", DELETE: "#ef4444" };
+const MC: Record<string, string> = { GET: "#10b981", POST: "var(--color-fg)", DELETE: "#ef4444" };
 
 const ENDPOINTS = [
   {
@@ -90,7 +90,7 @@ function CodeBlock({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div style={{ position: "relative" }}>
-      <pre style={{ background: "#000000", border: "1px solid #27272a", borderRadius: 8, padding: "12px 14px", fontSize: 12, overflowX: "auto", color: "#f4f4f5", fontFamily: "monospace" }}>
+      <pre className="docs-code-block">
         <code>{code}</code>
       </pre>
       <button
@@ -99,7 +99,7 @@ function CodeBlock({ code }: { code: string }) {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         }}
-        style={{ position: "absolute", top: 8, right: 8, padding: "3px 8px", borderRadius: 4, border: "1px solid #27272a", background: "#18181b", color: "#a1a1aa", fontSize: 10, cursor: "pointer" }}
+        className="docs-copy-btn"
       >
         {copied ? "Copied" : "Copy"}
       </button>
@@ -111,44 +111,41 @@ export default function DocsPage() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#000000" }}>
+    <div className="page-shell">
       <Navbar />
 
       <main style={{ flex: 1, maxWidth: 1000, width: "100%", margin: "0 auto", padding: "60px 20px 80px" }}>
-        
+
         {/* Header */}
         <div style={{ marginBottom: 40 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 12px", borderRadius: 9999, background: "#18181b", border: "1px solid #27272a", fontSize: 11, fontWeight: 700, color: "#a1a1aa", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 12 }}>
-            Developer Documentation
-          </div>
-          <h1 style={{ fontSize: 36, fontWeight: 900, letterSpacing: "-1px", color: "#ffffff", marginBottom: 8 }}>
+          <h1 style={{ fontSize: 36, fontWeight: 900, letterSpacing: "-1px", color: "var(--color-fg)", marginBottom: 8 }}>
             theflate API Reference
           </h1>
-          <p style={{ fontSize: 14, color: "#a1a1aa", maxWidth: 640 }}>
+          <p style={{ fontSize: 14, color: "var(--color-fg-2)", maxWidth: 640 }}>
             Programmatic media compression, format conversion, link extraction, and OpenAI Whisper transcription endpoints.
           </p>
         </div>
 
         {/* Base URL Box */}
-        <div style={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 10, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 40, flexWrap: "wrap", gap: 12 }}>
+        <div className="card" style={{ padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 40, flexWrap: "wrap", gap: 12 }}>
           <div>
-            <div style={{ fontSize: 11, color: "#71717a", textTransform: "uppercase", fontWeight: 700, marginBottom: 2 }}>Base Endpoint</div>
-            <code style={{ fontSize: 14, color: "#ffffff", fontWeight: 700, fontFamily: "monospace" }}>{BASE}</code>
+            <div className="label" style={{ marginBottom: 2 }}>Base Endpoint</div>
+            <code style={{ fontSize: 14, color: "var(--color-fg)", fontWeight: 700, fontFamily: "monospace" }}>{BASE}</code>
           </div>
-          <div style={{ fontSize: 12, color: "#a1a1aa" }}>
-            Pass header: <code style={{ background: "#18181b", padding: "2px 8px", borderRadius: 4, color: "#ffffff" }}>x-api-key: vp_YOUR_KEY</code>
+          <div style={{ fontSize: 12, color: "var(--color-fg-2)" }}>
+            Pass header: <code className="docs-inline-code">x-api-key: vp_YOUR_KEY</code>
           </div>
         </div>
 
         {/* Rate Limits Grid */}
         <div style={{ marginBottom: 48 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#ffffff", marginBottom: 14 }}>Rate Limits & Tiers</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-fg)", marginBottom: 14 }}>Rate Limits & Tiers</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
             {RATES.map((r) => (
-              <div key={r.tier} style={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 8, padding: 12 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: "#ffffff" }}>{r.tier}</div>
+              <div key={r.tier} className="card" style={{ padding: 12 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-fg)" }}>{r.tier}</div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: "#10b981", margin: "4px 0" }}>{r.limit}</div>
-                {r.note && <div style={{ fontSize: 10, color: "#71717a" }}>{r.note}</div>}
+                {r.note && <div style={{ fontSize: 10, color: "var(--color-fg-3)" }}>{r.note}</div>}
               </div>
             ))}
           </div>
@@ -156,39 +153,39 @@ export default function DocsPage() {
 
         {/* Endpoints List */}
         <div>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: "#ffffff", marginBottom: 16 }}>API Endpoints</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: "var(--color-fg)", marginBottom: 16 }}>API Endpoints</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {ENDPOINTS.map((ep, idx) => {
               const isOpen = openIndex === idx;
               return (
-                <div key={ep.path} style={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 10, overflow: "hidden" }}>
+                <div key={ep.path} className="card" style={{ overflow: "hidden" }}>
                   <button
                     onClick={() => setOpenIndex(isOpen ? null : idx)}
-                    style={{ width: "100%", padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "transparent", border: "none", cursor: "pointer", textAlign: "left" }}
+                    className="docs-endpoint-btn"
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <span style={{ fontSize: 11, fontWeight: 900, color: MC[ep.method], background: "#18181b", padding: "2px 8px", borderRadius: 4, border: "1px solid #27272a" }}>
+                      <span className="docs-method-badge" style={{ color: MC[ep.method] }}>
                         {ep.method}
                       </span>
-                      <code style={{ fontSize: 14, fontWeight: 700, color: "#ffffff" }}>{ep.path}</code>
+                      <code style={{ fontSize: 14, fontWeight: 700, color: "var(--color-fg)" }}>{ep.path}</code>
                     </div>
-                    <span style={{ fontSize: 12, color: "#71717a" }}>{isOpen ? "−" : "+"}</span>
+                    <span style={{ fontSize: 12, color: "var(--color-fg-3)" }}>{isOpen ? "−" : "+"}</span>
                   </button>
 
                   {isOpen && (
-                    <div style={{ padding: "0 18px 18px", borderTop: "1px solid #18181b", paddingTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
-                      <p style={{ fontSize: 13, color: "#a1a1aa" }}>{ep.desc}</p>
-                      
+                    <div style={{ padding: "0 18px 18px", borderTop: "1px solid var(--color-surface-2)", paddingTop: 14, display: "flex", flexDirection: "column", gap: 14 }}>
+                      <p style={{ fontSize: 13, color: "var(--color-fg-2)" }}>{ep.desc}</p>
+
                       {ep.req && (
                         <div>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#71717a", textTransform: "uppercase", marginBottom: 6 }}>Request Format</div>
+                          <div className="label" style={{ marginBottom: 6 }}>Request Format</div>
                           <CodeBlock code={ep.req} />
                         </div>
                       )}
 
                       {ep.res && (
                         <div>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#71717a", textTransform: "uppercase", marginBottom: 6 }}>Response Payload</div>
+                          <div className="label" style={{ marginBottom: 6 }}>Response Payload</div>
                           <CodeBlock code={ep.res} />
                         </div>
                       )}

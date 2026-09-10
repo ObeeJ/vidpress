@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 export function TheflateLogo({ interactive = false }: { interactive?: boolean }) {
   const [pressed, setPressed] = useState(false);
 
-  // The logo: a 3D isometric cube collapsing/deflating into a solid compact 2D neon tile.
+  // The logo: a 2D flat container frame deflating into a compact solid neon core.
   return (
     <div
       className={`logo-mark${interactive ? " logo-mark-interactive" : ""}${pressed ? " logo-mark-pressed" : ""}`}
@@ -27,15 +27,11 @@ export function TheflateLogo({ interactive = false }: { interactive?: boolean })
         {/* Background tile */}
         <rect width="32" height="32" rx="7" fill="#171717" />
 
-        {/* Ghosted 3D upper box wireframe representing raw uncompressed volume */}
-        <polygon points="16,6 23,10 16,14 9,10" stroke="#C9F24E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" strokeOpacity="0.3" fill="none" className="logo-ghost-top" />
-        <line x1="9" y1="10" x2="9" y2="15" stroke="#C9F24E" strokeWidth="1.5" strokeOpacity="0.2" className="logo-ghost-line" />
-        <line x1="23" y1="10" x2="23" y2="15" stroke="#C9F24E" strokeWidth="1.5" strokeOpacity="0.2" className="logo-ghost-line" />
-        <line x1="16" y1="14" x2="16" y2="19" stroke="#C9F24E" strokeWidth="1.5" strokeOpacity="0.25" className="logo-ghost-line" />
+        {/* Ghosted outer 2D frame (original dimensions) */}
+        <rect x="7" y="7" width="18" height="18" rx="3" stroke="#C9F24E" strokeWidth="1.6" strokeDasharray="3 2" strokeOpacity="0.35" fill="none" className="logo-ghost-frame" />
 
-        {/* Solid compressed bottom diamond representing deflated high-density media */}
-        <polygon points="16,19 24,23 16,27 8,23" fill="#C9F24E" fillOpacity="0.25" stroke="#C9F24E" strokeWidth="2" strokeLinejoin="round" className="logo-plane" />
-        <circle cx="16" cy="23" r="1.8" fill="#C9F24E" className="logo-core" />
+        {/* Solid compressed 2D inner bar (deflated core) */}
+        <rect x="10" y="14" width="12" height="4" rx="2" fill="#C9F24E" className="logo-flat-core" />
       </svg>
       <span className="logo-wordmark">
         <span className="logo-prefix">the</span>
