@@ -15,10 +15,11 @@ ENV PATH="/root/.cargo/bin:$PATH"
 
 WORKDIR /app
 
-# Build whisper-cli native C++ binary (~15MB)
+# Build whisper-cli native C++ binary (~15MB) as a static binary so the
+# runtime stage doesn't need libwhisper.so.1 or any other shared lib.
 RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /tmp/whisper.cpp \
     && cd /tmp/whisper.cpp \
-    && cmake -B build -DWHISPER_BUILD_EXAMPLES=ON \
+    && cmake -B build -DWHISPER_BUILD_EXAMPLES=ON -DBUILD_SHARED_LIBS=OFF \
     && cmake --build build --config Release --target whisper-cli \
     && cp build/bin/whisper-cli /tmp/whisper-cli
 
@@ -42,7 +43,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     curl \
     ca-certificates \
-    python3-minimal \
+    python3 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install standalone yt-dlp binary (~30MB)
