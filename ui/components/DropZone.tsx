@@ -29,6 +29,7 @@ export default function DropZone() {
 
   return (
     <label
+      className="dropzone"
       htmlFor={inputRef.current?.id}
       aria-describedby={descId}
       onDragEnter={(e) => { e.preventDefault(); dragDepth.current++; setDragging(true); }}

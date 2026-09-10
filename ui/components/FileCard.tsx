@@ -63,10 +63,10 @@ function kindIcon(kind: string) {
   );
 }
 
-const stat = (label: string, value: string, color?: string) => (
-  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-    <span style={{ fontSize: 14, fontWeight: 700, color: color ?? "#ffffff" }}>{value}</span>
-    <span style={{ fontSize: 11, color: "#71717a" }}>{label}</span>
+const stat = (label: string, value: string, colorVar?: string) => (
+  <div className="fc-stat">
+    <span className="fc-stat-value" style={colorVar ? { color: colorVar } : undefined}>{value}</span>
+    <span className="fc-stat-label">{label}</span>
   </div>
 );
 
@@ -201,64 +201,52 @@ export default function FileCard({ item }: { item: FileItem }) {
   }
 
   return (
-    <div style={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 12, overflow: "hidden" }}>
+    <div className="fc-card">
       {/* Card Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "1px solid #18181b", gap: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, color: "#a1a1aa" }}>
+      <div className="fc-header">
+        <div className="fc-header-id">
           {kindIcon(profile?.kind ?? "")}
-          <span style={{ fontWeight: 600, fontSize: 13, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span className="fc-header-name">
             {item.file.name}
           </span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+        <div className="fc-header-right">
           {job?.status && (
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 700,
-                padding: "2px 8px",
-                borderRadius: 4,
-                background: job.status === "done" ? "#10b98122" : job.status === "failed" ? "#ef444422" : "#18181b",
-                color: job.status === "done" ? "#10b981" : job.status === "failed" ? "#ef4444" : "#a1a1aa",
-                border: `1px solid ${job.status === "done" ? "#10b98144" : job.status === "failed" ? "#ef444444" : "#27272a"}`,
-              }}
-            >
+            <span className="fc-badge" data-status={job.status}>
               {job.status}
             </span>
           )}
           <button
             onClick={() => removeFile(item.localUrl)}
             aria-label="Remove item"
-            style={{ background: "none", border: "none", color: "#71717a", cursor: "pointer", fontSize: 18, lineHeight: 1, padding: 2 }}
+            className="fc-close-btn"
           >
             ×
           </button>
         </div>
       </div>
 
-      <div style={{ padding: "18px", display: "flex", flexDirection: "column", gap: 18 }}>
+      <div className="fc-body">
         {/* Error */}
         {item.error && (
-          <div style={{ color: "#ef4444", fontSize: 12, background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.2)", padding: "10px 14px", borderRadius: 8 }}>
+          <div className="fc-error">
             {item.error}
           </div>
         )}
 
         {/* Upload & Analysis Progress */}
         {!profile && !item.error && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a1a1aa" }}>
+          <div className="fc-progress-row">
+            <div className="fc-progress-label">
               <span>{item.ingestId ? "Inspecting file..." : "Uploading..."}</span>
               {!item.ingestId && <span>{item.uploadPct ?? 0}%</span>}
             </div>
-            <div style={{ height: 4, background: "#18181b", borderRadius: 99, overflow: "hidden" }}>
+            <div className="fc-bar">
               <div
+                className="fc-bar-fill"
                 style={{
-                  height: "100%",
                   width: item.ingestId ? "100%" : `${item.uploadPct ?? 0}%`,
-                  background: item.ingestId ? "#10b981" : "#ffffff",
-                  borderRadius: 99,
-                  transition: "width 0.3s ease",
+                  background: item.ingestId ? "#10b981" : "var(--color-fg)",
                 }}
               />
             </div>
@@ -267,7 +255,7 @@ export default function FileCard({ item }: { item: FileItem }) {
 
         {/* Profile Stats */}
         {profile && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "12px 14px" }}>
+          <div className="fc-stat-grid fc-stat-grid-4">
             {stat("Size", fmt(profile.size_bytes))}
             {stat("Format", profile.codec_name)}
             {profile.duration_secs > 0 ? stat("Duration", fmtTime(Math.round(profile.duration_secs))) : stat("Type", profile.kind)}
@@ -277,19 +265,15 @@ export default function FileCard({ item }: { item: FileItem }) {
 
         {/* Format Picker */}
         {profile && !job && profile.available_formats?.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ fontSize: 12, color: "#a1a1aa", fontWeight: 500 }}>Output Format</span>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div className="fc-progress-row">
+            <span className="fc-section-label">Output Format</span>
+            <div className="fc-pill-row">
               {profile.available_formats.map((fmtExt) => (
                 <button
                   key={fmtExt}
                   onClick={() => setOutputFormat(item.localUrl, fmtExt)}
-                  style={{
-                    padding: "4px 12px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 700, textTransform: "uppercase",
-                    border: `1px solid ${selectedFormat === fmtExt ? "#ffffff" : "#27272a"}`,
-                    background: selectedFormat === fmtExt ? "#18181b" : "#09090b",
-                    color: selectedFormat === fmtExt ? "#ffffff" : "#71717a",
-                  }}
+                  className="fc-pill fc-pill-format"
+                  data-selected={selectedFormat === fmtExt}
                 >
                   {fmtExt}
                 </button>
@@ -300,22 +284,18 @@ export default function FileCard({ item }: { item: FileItem }) {
 
         {/* Preset Selector */}
         {profile && !job && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <span style={{ fontSize: 12, color: "#a1a1aa", fontWeight: 500 }}>Quality Preset</span>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <div className="fc-progress-row">
+            <span className="fc-section-label">Quality Preset</span>
+            <div className="fc-pill-row">
               {PRESETS.map((p) => (
                 <button
                   key={p.id}
                   onClick={() => setPreset(item.localUrl, p.id)}
-                  style={{
-                    padding: "6px 12px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, textAlign: "left",
-                    border: `1px solid ${selectedPreset === p.id ? "#ffffff" : "#27272a"}`,
-                    background: selectedPreset === p.id ? "#18181b" : "#09090b",
-                    color: selectedPreset === p.id ? "#ffffff" : "#71717a",
-                  }}
+                  className="fc-pill"
+                  data-selected={selectedPreset === p.id}
                 >
                   <div>{p.label}</div>
-                  <div style={{ fontSize: 10, fontWeight: 400, color: "#71717a", marginTop: 2 }}>{p.desc}</div>
+                  <div className="fc-pill-desc">{p.desc}</div>
                 </button>
               ))}
             </div>
@@ -324,12 +304,12 @@ export default function FileCard({ item }: { item: FileItem }) {
 
         {/* Target Size Slider */}
         {profile && !job && selectedPreset === "original" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ color: "#a1a1aa", fontSize: 12 }}>Target file size</span>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ fontWeight: 700, fontSize: 14, color: "#ffffff" }}>{targetMb.toFixed(1)} MB</span>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: "#10b98122", color: "#10b981", border: "1px solid #10b98144" }}>
+          <div className="fc-slider-row">
+            <div className="fc-slider-header">
+              <span className="fc-progress-label fc-label-inline">Target file size</span>
+              <div className="fc-slider-value">
+                <span className="fc-stat-value">{targetMb.toFixed(1)} MB</span>
+                <span className="fc-savings-badge">
                   −{savingPct}%
                 </span>
               </div>
@@ -337,14 +317,14 @@ export default function FileCard({ item }: { item: FileItem }) {
             <input
               type="range" min={minMb} max={originalMb} step={0.1} value={targetMb}
               onChange={(e) => setTargetMb(item.localUrl, Number(e.target.value))}
-              style={{ width: "100%", accentColor: "#ffffff", cursor: "pointer" }}
+              className="fc-range"
             />
           </div>
         )}
 
         {/* Estimates */}
         {profile && !job && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "10px 14px" }}>
+          <div className="fc-stat-grid fc-stat-grid-3">
             {stat("Est. Cost", costEstimate, "#10b981")}
             {stat("Compression Time", fmtTime(profile.estimated_time_secs))}
             {stat("Download Time", fmtTime(downloadTimeSecs))}
@@ -353,15 +333,15 @@ export default function FileCard({ item }: { item: FileItem }) {
 
         {/* Compress Button */}
         {profile && !job && (
-          <Button variant="primary" onClick={theflate} style={{ width: "100%", padding: "10px" }}>
+          <Button variant="primary" onClick={theflate} className="fc-btn-full">
             Compress →
           </Button>
         )}
 
         {/* Processing State */}
         {job && job.status !== "done" && job.status !== "failed" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#a1a1aa" }}>
+          <div className="fc-slider-row">
+            <div className="fc-progress-label">
               <span>{job.status === "queued" ? "In queue..." : "Compressing..."}</span>
               <span>
                 {job.status === "queued"
@@ -369,59 +349,59 @@ export default function FileCard({ item }: { item: FileItem }) {
                   : `${job.progress}% · ETA ${fmtTime(job.eta_secs > 0 ? job.eta_secs : profile?.estimated_time_secs ?? 0)}`}
               </span>
             </div>
-            <div style={{ height: 6, background: "#18181b", borderRadius: 99, overflow: "hidden" }}>
-              <div style={{
-                height: "100%",
-                width: job.progress > 0 ? `${job.progress}%` : "100%",
-                background: "#ffffff",
-                borderRadius: 99,
-                transition: job.progress > 0 ? "width 0.4s ease" : "none",
-                animation: job.progress === 0 ? "theflate-pulse 1.5s ease-in-out infinite" : "none",
-                opacity: job.progress === 0 ? undefined : 1,
-              }} />
+            <div className="fc-bar fc-bar-lg">
+              <div
+                className="fc-bar-fill"
+                style={{
+                  width: job.progress > 0 ? `${job.progress}%` : "100%",
+                  background: "var(--color-fg)",
+                  transition: job.progress > 0 ? "width 0.4s ease" : "none",
+                  animation: job.progress === 0 ? "theflate-pulse 1.5s ease-in-out infinite" : "none",
+                }}
+              />
             </div>
           </div>
         )}
 
         {/* Done State */}
         {job?.status === "done" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div className="fc-progress-row fc-done-gap">
             {/* Contract gesture — the signature motion moment */}
-            <div className="contract tabular" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, background: "#121215", border: "1px solid #18181b", borderRadius: 8, padding: "12px 14px" }}>
+            <div className="contract tabular fc-stat-grid fc-stat-grid-3">
               {stat("Original", fmt(job.original_bytes))}
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: "var(--color-signal, #C9F24E)" }}>
+              <div className="fc-stat">
+                <span className="fc-stat-value fc-stat-signal">
                   <CountUp from={job.original_bytes} to={job.compressed_bytes} format={fmt} durationMs={560} />
                 </span>
-                <span style={{ fontSize: 11, color: "#71717a" }}>Compressed</span>
+                <span className="fc-stat-label">Compressed</span>
               </div>
-              {stat("Saved", `${(((job.original_bytes - job.compressed_bytes) / job.original_bytes) * 100).toFixed(1)}%`, "var(--color-signal, #C9F24E)")}
+              {stat("Saved", `${(((job.original_bytes - job.compressed_bytes) / job.original_bytes) * 100).toFixed(1)}%`, "var(--color-signal)")}
             </div>
 
             {/* Media Preview */}
             {outputUrl && profile && (
-              <div style={{ borderRadius: 8, overflow: "hidden", background: "#000000", border: "1px solid #27272a" }}>
+              <div className="fc-media-frame">
                 {profile.kind === "video" || profile.kind === "image_animated" ? (
-                  <video src={outputUrl} controls crossOrigin="anonymous" style={{ width: "100%", maxHeight: 280, display: "block" }} />
+                  <video src={outputUrl} controls crossOrigin="anonymous" />
                 ) : profile.kind?.includes("audio") ? (
-                  <audio src={outputUrl} controls crossOrigin="anonymous" style={{ width: "100%", padding: 12 }} />
+                  <audio src={outputUrl} controls crossOrigin="anonymous" />
                 ) : (
-                  <img src={outputUrl} alt="preview" style={{ width: "100%", maxHeight: 280, objectFit: "contain", display: "block" }} />
+                  <img src={outputUrl} alt="preview" />
                 )}
               </div>
             )}
 
             {/* Transcription */}
             {(profile?.kind === "video" || profile?.kind?.includes("audio")) && (
-              <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 14, display: "flex", flexDirection: "column", gap: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>Transcribe</div>
+              <div className="fc-panel">
+                <div className="fc-panel-header">
+                  <div className="fc-panel-title">Transcribe</div>
                   <Button variant="secondary" size="sm" onClick={runTranscription} disabled={transcribing}>
                     {transcribing ? "Transcribing..." : transcription ? "Redo" : "Generate"}
                   </Button>
                 </div>
                 {transcription && (
-                  <div style={{ background: "#000000", border: "1px solid #18181b", borderRadius: 6, padding: 12, fontSize: 12, color: "#a1a1aa", maxHeight: 120, overflowY: "auto", whiteSpace: "pre-wrap" }}>
+                  <div className="fc-transcript-box">
                     {transcription}
                   </div>
                 )}
@@ -429,48 +409,44 @@ export default function FileCard({ item }: { item: FileItem }) {
             )}
 
             {/* Cloud Export */}
-            <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className="fc-panel">
+              <div className="fc-panel-header">
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>Export to Cloud Storage</div>
-                  <div style={{ fontSize: 11, color: "#71717a" }}>Send your file to AWS S3, Cloudflare R2, Supabase, Google Drive, or Dropbox</div>
+                  <div className="fc-panel-title">Export to Cloud Storage</div>
+                  <div className="fc-panel-desc">Send your file to AWS S3, Cloudflare R2, Supabase, Google Drive, or Dropbox</div>
                 </div>
                 <Button variant="secondary" size="sm" onClick={() => setShowExport(!showExport)}>
                   {showExport ? "Hide Target" : "Configure Destination"}
                 </Button>
               </div>
               {showExport && (
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: 4 }}>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <div className="fc-progress-row fc-pt-1">
+                  <div className="fc-pill-row">
                     {DESTINATIONS.map((dest) => (
                       <button
                         key={dest.id}
                         onClick={() => setExportProvider(dest.id)}
-                        style={{
-                          padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: "pointer",
-                          border: `1px solid ${exportProvider === dest.id ? "#ffffff" : "#27272a"}`,
-                          background: exportProvider === dest.id ? "#18181b" : "#000000",
-                          color: exportProvider === dest.id ? "#ffffff" : "#71717a",
-                        }}
+                        className="fc-pill fc-pill-format fc-pill-no-transform"
+                        data-selected={exportProvider === dest.id}
                       >
                         {dest.name}
                       </button>
                     ))}
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div className="fc-export-row">
                     <input
                       value={exportBucket}
                       onChange={(e) => setExportBucket(e.target.value)}
                       placeholder={DESTINATIONS.find((d) => d.id === exportProvider)?.placeholder ?? "target-name"}
-                      style={{ flex: 1, padding: "8px 12px", borderRadius: 6, background: "#000000", border: "1px solid #27272a", color: "#ffffff", fontSize: 12, outline: "none" }}
+                      className="fc-export-input"
                     />
                     <Button variant="primary" size="sm" onClick={handleDestinationExport} disabled={exporting}>
                       {exporting ? "Exporting..." : "Send File"}
                     </Button>
                   </div>
                   {exportedUrl && (
-                    <div style={{ fontSize: 11, color: "#10b981", background: "#10b98111", border: "1px solid #10b98133", padding: "8px 12px", borderRadius: 6, wordBreak: "break-all" }}>
-                      Successfully exported: <a href={exportedUrl} target="_blank" rel="noreferrer" style={{ color: "#10b981", fontWeight: 700 }}>{exportedUrl}</a>
+                    <div className="fc-export-success">
+                      Successfully exported: <a href={exportedUrl} target="_blank" rel="noreferrer" className="fc-export-link">{exportedUrl}</a>
                     </div>
                   )}
                 </div>
@@ -478,15 +454,14 @@ export default function FileCard({ item }: { item: FileItem }) {
             </div>
 
             {/* Actions */}
-            <div style={{ display: "flex", gap: 10 }}>
-              <Button variant="secondary" onClick={() => setShowQrModal(!showQrModal)} style={{ flex: 1 }}>
+            <div className="fc-actions">
+              <Button variant="secondary" onClick={() => setShowQrModal(!showQrModal)}>
                 {showQrModal ? "Hide QR Code" : "QR Share"}
               </Button>
               {outputUrl && (
                 <Button
                   variant="primary"
                   onClick={() => downloadFile(job!.id, `theflated_${item.file.name}`)}
-                  style={{ flex: 1 }}
                 >
                   Download
                 </Button>
@@ -495,12 +470,12 @@ export default function FileCard({ item }: { item: FileItem }) {
 
             {/* QR Modal */}
             {showQrModal && shareUrl && (
-              <div style={{ background: "#121215", border: "1px solid #27272a", borderRadius: 8, padding: 16, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
-                <span style={{ fontSize: 12, color: "#a1a1aa" }}>Scan camera to download on mobile device</span>
-                <div style={{ background: "#ffffff", padding: 10, borderRadius: 8 }}>
+              <div className="fc-qr-box">
+                <span className="fc-qr-hint">Scan camera to download on mobile device</span>
+                <div className="fc-qr-frame">
                   <QRCodeSVG value={shareUrl} size={140} />
                 </div>
-                <span style={{ fontSize: 10, color: "#71717a", wordBreak: "break-all", textAlign: "center" }}>{shareUrl}</span>
+                <span className="fc-qr-url">{shareUrl}</span>
               </div>
             )}
           </div>

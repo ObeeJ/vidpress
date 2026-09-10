@@ -10,19 +10,26 @@ import ScreenRecorder from "@/components/ScreenRecorder";
 import LiveStream from "@/components/LiveStream";
 import { useStore } from "@/lib/store";
 
+const TABS = [
+  { id: "upload", label: "Upload" },
+  { id: "url",    label: "Social Link" },
+  { id: "screen", label: "Screen" },
+  { id: "live",   label: "Live" },
+] as const;
+
 export default function Home() {
   const { files } = useStore();
   const [activeTab, setActiveTab] = useState<"upload" | "url" | "screen" | "live">("upload");
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#000000" }}>
+    <div className="page-shell">
       <Navbar />
 
-      <main className="measure" style={{ flex: 1, padding: "48px 0 80px", display: "flex", flexDirection: "column", gap: 32 }}>
-        
+      <main className="measure page-main">
+
         {/* Hero */}
-        <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-          <h1 className="display" style={{ color: "#ffffff", maxWidth: 760 }}>
+        <div className="hero">
+          <h1 className="display hero-title">
             Deflate any file. Instantly.
           </h1>
 
@@ -32,36 +39,19 @@ export default function Home() {
         </div>
 
         {/* Action Input Mode Selector */}
-        <div role="tablist" style={{ display: "flex", background: "#09090b", border: "1px solid #27272a", borderRadius: 10, padding: 4, gap: 2 }}>
-          {([
-            { id: "upload", label: "Upload" },
-            { id: "url",    label: "Social Link" },
-            { id: "screen", label: "Screen" },
-            { id: "live",   label: "Live" },
-          ] as const).map(({ id, label }) => (
+        <div role="tablist" className="tablist">
+          {TABS.map(({ id, label }) => (
             <button
               key={id}
               role="tab"
               aria-selected={activeTab === id}
+              className="tab"
               onClick={() => setActiveTab(id)}
               onKeyDown={(e) => {
-                const tabs = ["upload", "url", "screen", "live"] as const;
+                const tabs = TABS.map((t) => t.id);
                 const i = tabs.indexOf(id);
                 if (e.key === "ArrowRight") setActiveTab(tabs[(i + 1) % tabs.length]);
                 if (e.key === "ArrowLeft")  setActiveTab(tabs[(i - 1 + tabs.length) % tabs.length]);
-              }}
-              style={{
-                flex: 1,
-                padding: "10px 8px",
-                borderRadius: 8,
-                border: "none",
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: "pointer",
-                background: activeTab === id ? "#18181b" : "transparent",
-                color: activeTab === id ? "#ffffff" : "#71717a",
-                transition: "background-color 0.15s ease, color 0.15s ease",
-                whiteSpace: "nowrap",
               }}
             >
               {label}
@@ -77,8 +67,8 @@ export default function Home() {
 
         {/* Active File Cards Queue */}
         {files.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#ffffff" }}>
+          <div className="queue">
+            <div className="queue-heading">
               Active Queue ({files.length})
             </div>
             {files.map((item, index) => (
