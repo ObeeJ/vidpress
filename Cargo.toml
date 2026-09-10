@@ -17,8 +17,8 @@ ureq = { version = "2", features = ["json"] }
 reqwest = { version = "0.12", features = ["json", "blocking"] }
 
 [dependencies]
-glideapi = { path = "../glideapi" }
-glideapi_macros = { path = "../glideapi/glideapi_macros" }
+glideapi = { git = "https://github.com/ObeeJ/glideapi", rev = "d2a9025" }
+glideapi_macros = { git = "https://github.com/ObeeJ/glideapi", rev = "d2a9025" }
 linkme = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
