@@ -89,22 +89,27 @@ pub async fn run(
                 if let Some(us) = parse_out_time_us(&content) {
                     let elapsed = us as f64 / 1_000_000.0;
                     let pass = current_pass_task.load(Ordering::Relaxed);
-                    let (pct, eta) = if is_two_pass {
-                        if pass == 1 {
-                            let p = ((elapsed / duration.max(0.1)) * 50.0).min(49.0) as u8;
-                            let rem = (2.0 * duration - elapsed).max(0.0) as u64;
-                            (p, rem)
+                    let (pct, eta) = if duration > 0.1 {
+                        if is_two_pass {
+                            if pass == 1 {
+                                let p = ((elapsed / duration) * 50.0).min(49.0) as u8;
+                                let rem = (2.0 * duration - elapsed).max(0.0) as u64;
+                                (p, rem)
+                            } else {
+                                let p = (50.0 + (elapsed / duration) * 50.0).min(99.0) as u8;
+                                let rem = (duration - elapsed).max(0.0) as u64;
+                                (p, rem)
+                            }
                         } else {
-                            let p = (50.0 + (elapsed / duration.max(0.1)) * 50.0).min(99.0) as u8;
-                            let rem = (duration - elapsed).max(0.0) as u64;
+                            let p = ((elapsed / duration) * 100.0).min(99.0) as u8;
+                            let rem = if p > 0 {
+                                ((elapsed / (p as f64 / 100.0)) - elapsed) as u64
+                            } else { 0 };
                             (p, rem)
                         }
                     } else {
-                        let p = ((elapsed / duration.max(0.1)) * 100.0).min(99.0) as u8;
-                        let rem = if p > 0 {
-                            ((elapsed / (p as f64 / 100.0)) - elapsed) as u64
-                        } else { 0 };
-                        (p, rem)
+                        // duration unknown - show activity without a meaningful ETA
+                        (1_u8.max((elapsed as u8).min(99)), 0)
                     };
                     let mut s = jobs_p.lock().unwrap();
                     if let Some(job) = s.get_mut(&id_p) {
@@ -158,9 +163,7 @@ pub async fn run(
         pass1_args.extend([
             "-pass".into(), "1".into(), "-passlogfile".into(), passlogfile.clone(),
         ]);
-        if duration > 0.1 {
-            pass1_args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
-        }
+        pass1_args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
         pass1_args.extend(["-an".into(), "-f".into(), "null".into(), null_output.into()]);
 
         current_pass.store(1, Ordering::Relaxed);
@@ -218,9 +221,7 @@ pub async fn run(
             "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
             "-movflags".into(), "+faststart".into(),
         ]);
-        if duration > 0.1 {
-            pass2_args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
-        }
+        pass2_args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
         pass2_args.push(output.clone());
 
         current_pass.store(2, Ordering::Relaxed);
@@ -303,9 +304,7 @@ pub async fn run(
 
         let mut args: Vec<String> = vec!["-y".into(), "-threads".into(), num_cpus(), "-i".into(), input];
         args.extend(ffmpeg_args);
-        if duration > 0.1 {
-            args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
-        }
+        args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
         args.push(output.clone());
 
         let child = match Command::new("ffmpeg").args(&args)
