@@ -21,7 +21,6 @@ export default function Footer() {
               <div style={{ fontSize: 12, fontWeight: 700, color: "#ffffff", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>Product</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <Link href="/" style={{ fontSize: 13, color: "#a1a1aa", textDecoration: "none" }}>Engine</Link>
-                <Link href="/pricing" style={{ fontSize: 13, color: "#a1a1aa", textDecoration: "none" }}>Pricing</Link>
                 <Link href="/docs" style={{ fontSize: 13, color: "#a1a1aa", textDecoration: "none" }}>API Docs</Link>
               </div>
             </div>

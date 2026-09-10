@@ -27,10 +27,10 @@ export default function PoemPage() {
             Explosive growth is the fundamental prerequisite of a true startup. High inherent demand means the value created pulls the company forward.
           </p>
           <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
-            <Link href="/" className="vpx-button-primary">
+            <Link href="/" className="btn-primary">
               Try theflate
             </Link>
-            <Link href="/docs" className="vpx-button-secondary">
+            <Link href="/docs" className="btn-secondary">
               View API Docs
             </Link>
           </div>

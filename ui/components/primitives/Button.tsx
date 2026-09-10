@@ -9,8 +9,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClass: Record<string, string> = {
-  primary:   "vpx-button-primary",
-  secondary: "vpx-button-secondary",
+  primary:   "btn-primary",
+  secondary: "btn-secondary",
   ghost:     "btn",
 };
 

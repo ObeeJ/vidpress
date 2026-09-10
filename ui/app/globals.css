@@ -285,16 +285,14 @@ p { text-wrap: pretty; }
 /* ---------------------------------------------------------------------------
    controls
 
-   `.vpx-*` names are kept verbatim because 12 call sites across FileCard,
-   LiveStream, ScreenRecorder, UrlDownloader and poem/page still reference
-   them. They now resolve to the token system instead of hardcoded hex, so the
-   rename to `.btn-*` can happen later as a pure find-and-replace with no
-   visual change.
+   Renamed from `.vpx-button-*` to `.btn-*` — the token-backed styling was
+   already in place, this was a pure find-and-replace across Button.tsx,
+   poem/page.tsx and this file, with no visual change.
    ------------------------------------------------------------------------ */
 
 .btn,
-.vpx-button-primary,
-.vpx-button-secondary {
+.btn-primary,
+.btn-secondary {
   --btn-bg: var(--color-surface-2);
   --btn-fg: var(--color-fg);
   --btn-line: var(--color-line);
@@ -331,7 +329,7 @@ p { text-wrap: pretty; }
     opacity          var(--dur-1) var(--ease-out);
 }
 
-.vpx-button-primary {
+.btn-primary {
   --btn-bg: var(--color-signal);
   --btn-fg: var(--color-on-signal);
   --btn-line: var(--color-signal);
@@ -339,12 +337,12 @@ p { text-wrap: pretty; }
 }
 
 .btn:hover,
-.vpx-button-secondary:hover {
+.btn-secondary:hover {
   background: var(--color-surface-3);
   border-color: var(--color-line-lit);
 }
 
-.vpx-button-primary:hover {
+.btn-primary:hover {
   background: #D6FF62;
   border-color: #D6FF62;
 }
@@ -352,14 +350,14 @@ p { text-wrap: pretty; }
 /* 1px, not a scale transform — the press should feel like a key travelling,
    and it must not blur text on the way down. */
 .btn:active,
-.vpx-button-primary:active,
-.vpx-button-secondary:active {
+.btn-primary:active,
+.btn-secondary:active {
   transform: translate3d(0, 1px, 0);
 }
 
 .btn:disabled,
-.vpx-button-primary:disabled,
-.vpx-button-secondary:disabled {
+.btn-primary:disabled,
+.btn-secondary:disabled {
   opacity: 0.4;
   cursor: not-allowed;
   transform: none;
