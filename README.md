@@ -4,7 +4,7 @@
 
 ## What it does
 
-- **Compress** video, audio, and images (H.264, AAC, WebP, MP3, FLAC, and more)
+- **Compress** video, audio, and images — quality-preserving two-pass H.265 (`libx265`) bitrate encoding for target file sizes, plus H.264, AAC, WebP, MP3, FLAC, and more
 - **Convert** between formats (MP4, MOV, MKV, WebM, AVI, MP3, M4A, OGG, WAV, FLAC, JPG, PNG, WebP, GIF)
 - **Download** from YouTube, Instagram, TikTok, X (Twitter), Facebook — video or audio-only
 - **Transcribe** audio/video to text using OpenAI Whisper (base for free, medium for premium)
@@ -41,6 +41,7 @@ bun run dev
 |---|---|---|
 | `THEFLATE_STORAGE` | `/tmp/theflate_output` | Where compressed files are stored |
 | `THEFLATE_DB` | `/tmp/theflate.db` | SQLite database path |
+| `THEFLATE_CODEC` | `libx265` | Codec for software target_mb jobs (`libx265` default, `libx264`/`h264` fallback) |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Backend API base URL |
 | `NEXT_PUBLIC_BASE_URL` | `http://localhost:3000` | Public URL for QR codes and sharing |
 
