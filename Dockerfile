@@ -19,9 +19,18 @@ RUN git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git /tmp/whispe
     && cmake --build build --config Release --target whisper-cli \
     && cp build/bin/whisper-cli /tmp/whisper-cli
 
+# Pre-compile Cargo dependencies for layer caching
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir -p src \
+    && echo "fn main() {}" > src/main.rs \
+    && echo "pub fn dummy() {}" > src/lib.rs \
+    && cargo build --release \
+    && rm -rf src
+
 # Copy source code and build Rust backend
 COPY . .
-RUN cargo build --release
+# Touch src files so cargo knows real source supersedes the dummy build
+RUN touch src/main.rs src/lib.rs && cargo build --release
 
 # ── Stage 2: Ultra-lightweight Production Runner (~220MB) ─────────────────────
 FROM debian:bookworm-slim
