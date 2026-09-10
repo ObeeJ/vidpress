@@ -26,8 +26,10 @@ R=$(curl -sf "$API/health" 2>/dev/null || echo "CONN_FAIL")
 # ── 2. Create API key ─────────────────────────────────────────────────────────
 echo ""
 echo "2. Create API key"
+ADMIN_TOKEN="${THEFLATE_ADMIN_TOKEN:-test}"
 R=$(curl -sf -X POST "$API/keys" \
   -H "content-type: application/json" \
+  -H "x-admin-token: $ADMIN_TOKEN" \
   -d '{"name":"test-key","plan":"free"}' 2>/dev/null || echo "CONN_FAIL")
 KEY=$(echo "$R" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('key',''))" 2>/dev/null || echo "")
 [[ "$KEY" == vp_* ]] && ok "POST /keys returns key with vp_ prefix" || fail "POST /keys (got: $R)"
@@ -41,20 +43,20 @@ R=$(curl -sf -X POST "$API/ingest" \
   -H "x-file-name: test_video.mp4" \
   -H "x-api-key: $KEY" \
   --data-binary @"$TMPFILE" 2>/dev/null || echo "CONN_FAIL")
-SERVER_PATH=$(echo "$R" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('path',''))" 2>/dev/null || echo "")
-[[ -n "$SERVER_PATH" ]] && ok "POST /ingest returns server path: $SERVER_PATH" || fail "POST /ingest (got: $R)"
+INGEST_ID=$(echo "$R" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('ingest_id',''))" 2>/dev/null || echo "")
+[[ -n "$INGEST_ID" ]] && ok "POST /ingest returns ingest_id" || fail "POST /ingest (got: $R)"
 rm -f "$TMPFILE"
 
 # ── 4. Analyze (fake file — expect 415, not 500) ──────────────────────────────
 echo ""
 echo "4. Analyze fake file (expect 415 not 500)"
-if [[ -n "$SERVER_PATH" ]]; then
+if [[ -n "$INGEST_ID" ]]; then
   CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$API/analyze" \
     -H "content-type: application/json" \
     -H "x-api-key: $KEY" \
-    -d "{\"path\":\"$SERVER_PATH\"}")
+    -d "{\"ingest_id\":\"$INGEST_ID\"}")
   [[ "$CODE" == "415" ]] && ok "POST /analyze fake file returns 415 (correct rejection)" \
-    || fail "POST /analyze fake file returned $CODE (expected 415 — ffprobe may not be installed)"
+    || fail "POST /analyze fake file returned $CODE (expected 415)"
 fi
 
 # ── 5. Upload fake path (expect 415 or 400, not 500) ─────────────────────────
@@ -105,11 +107,13 @@ echo "9. White-label domain uniqueness"
 DOMAIN="test-$(date +%s).example.com"
 curl -sf -X POST "$API/keys" \
   -H "content-type: application/json" \
-  -d "{\"name\":\"wl1\",\"plan\":\"whitelabel\",\"white_label_domain\":\"$DOMAIN\"}" \
+  -H "x-admin-token: $ADMIN_TOKEN" \
+  -d "{\"name\":\"wl1\",\"plan\":\"white_label\",\"white_label_domain\":\"$DOMAIN\"}" \
   > /dev/null 2>&1 || true
 CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$API/keys" \
   -H "content-type: application/json" \
-  -d "{\"name\":\"wl2\",\"plan\":\"whitelabel\",\"white_label_domain\":\"$DOMAIN\"}")
+  -H "x-admin-token: $ADMIN_TOKEN" \
+  -d "{\"name\":\"wl2\",\"plan\":\"white_label\",\"white_label_domain\":\"$DOMAIN\"}")
 check_status "$CODE" "409" "Duplicate white-label domain returns 409"
 
 # ── 10. download-url missing url field → 400 ─────────────────────────────────

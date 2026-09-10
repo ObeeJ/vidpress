@@ -7,7 +7,7 @@
 - **Compress** video, audio, and images — quality-preserving two-pass H.265 (`libx265`) bitrate encoding for target file sizes, plus H.264, AAC, WebP, MP3, FLAC, and more
 - **Convert** between formats (MP4, MOV, MKV, WebM, AVI, MP3, M4A, OGG, WAV, FLAC, JPG, PNG, WebP, GIF)
 - **Download** from YouTube, Instagram, TikTok, X (Twitter), Facebook — video or audio-only
-- **Transcribe** audio/video to text using OpenAI Whisper (base for free, medium for premium)
+- **Transcribe** audio/video to text using OpenAI Whisper (`large-v3` for everyone)
 - **Preset profiles** — WhatsApp, Instagram Reel, Web, Twitter/X, Original
 - **Webhooks** — get notified when jobs complete, with HMAC signing on premium
 - **QR code sharing** — scan to download on any device
@@ -57,11 +57,11 @@ All requests accept `x-api-key: vp_YOUR_KEY` header. Anonymous requests are rate
 |---|---|---|---|
 | `POST` | `/ingest` | optional | Upload file bytes → returns `ingest_id` |
 | `POST` | `/analyze` | optional | Analyze file → codec, size, format options |
-| `POST` | `/upload` | optional | Queue compression job |
+| `POST` | `/upload` | optional | Queue compression job (two-pass H.265 when `target_mb` is set, override with `THEFLATE_CODEC`) |
 | `GET` | `/jobs/:id` | optional | Poll job status (no paths or credentials in response) |
 | `GET` | `/download/:id` | optional | Download compressed output |
 | `POST` | `/download-url` | premium | Download from YouTube/IG/TikTok/X |
-| `POST` | `/transcribe` | premium | Transcribe audio/video to text (async, returns `transcription_id`) |
+| `POST` | `/transcribe` | optional | Transcribe audio/video to text using Whisper `large-v3` (async, returns `transcription_id`) |
 | `GET` | `/transcriptions/:id` | optional | Get transcription result |
 | `POST` | `/export` | optional | Export to S3/R2/B2/Supabase |
 | `GET` | `/preview/:id` | optional | Preview first 4MB of output |
