@@ -54,7 +54,7 @@ COPY --from=builder /tmp/whisper-cli /usr/local/bin/whisper-cli
 
 # Bake GGML whisper base model (~140MB)
 RUN mkdir -p /app/models \
-    && curl -sSL --retry 5 --retry-delay 2 --retry-connrefused -C - https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin -o /app/models/ggml-base.bin
+    && curl -fSL --retry 10 --retry-delay 3 https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin -o /app/models/ggml-base.bin
 
 WORKDIR /app
 COPY --from=builder /app/target/release/theflate /usr/local/bin/theflate

@@ -18,12 +18,14 @@ const PRESETS = [
   { id: "twitter", label: "Twitter/X", desc: "Optimised for X" },
 ];
 
+// Only the providers the server actually implements. Google Drive and Dropbox
+// were listed here but /export returns 501 for them, so offering them just
+// produced a failed transfer.
 const DESTINATIONS = [
-  { id: "s3", name: "AWS S3 Bucket", placeholder: "my-s3-media-bucket" },
+  { id: "s3", name: "AWS S3", placeholder: "my-s3-bucket" },
   { id: "r2", name: "Cloudflare R2", placeholder: "my-r2-bucket" },
+  { id: "b2", name: "Backblaze B2", placeholder: "my-b2-bucket" },
   { id: "supabase", name: "Supabase Storage", placeholder: "my-supabase-bucket" },
-  { id: "gdrive", name: "Google Drive", placeholder: "Google Drive Folder" },
-  { id: "dropbox", name: "Dropbox", placeholder: "Dropbox Folder" },
 ];
 
 function fmt(bytes: number) {
@@ -84,6 +86,12 @@ export default function FileCard({ item }: { item: FileItem }) {
   const [showExport, setShowExport] = useState(false);
   const [exportProvider, setExportProvider] = useState("s3");
   const [exportBucket, setExportBucket] = useState("");
+  // Credentials live in component state for the duration of one export only —
+  // never localStorage, never sent anywhere but /export.
+  const [exportRegion, setExportRegion] = useState("us-east-1");
+  const [exportAccessKey, setExportAccessKey] = useState("");
+  const [exportSecretKey, setExportSecretKey] = useState("");
+  const [exportEndpoint, setExportEndpoint] = useState("");
   const [exporting, setExporting] = useState(false);
   const [exportedUrl, setExportedUrl] = useState<string | null>(null);
 
@@ -196,16 +204,34 @@ export default function FileCard({ item }: { item: FileItem }) {
 
   async function handleDestinationExport() {
     if (!job?.id) return;
+
+    // Fail here with something actionable rather than letting the server
+    // return a generic 400 for an empty bucket or missing keys.
+    if (!exportBucket.trim()) {
+      toast("Enter the bucket you want the file sent to.", "error");
+      return;
+    }
+    if (!exportAccessKey.trim() || !exportSecretKey.trim()) {
+      toast("Enter your access key and secret key for this transfer.", "error");
+      return;
+    }
+
     setExporting(true);
     try {
       const res = await exportToDestination(job.id, exportProvider, {
-        bucket: exportBucket || "my-media-bucket",
+        bucket: exportBucket.trim(),
+        region: exportRegion.trim() || "us-east-1",
+        endpoint: exportEndpoint.trim() || undefined,
+        accessKey: exportAccessKey.trim(),
+        secretKey: exportSecretKey.trim(),
         targetPath: `exports/${item.file.name}`,
       });
       setExportedUrl(res.remote_url);
-      toast(`Exported directly to ${exportProvider.toUpperCase()}`, "success");
+      // Drop the secret from memory as soon as the transfer is done.
+      setExportSecretKey("");
+      toast(`Exported to ${exportProvider.toUpperCase()}`, "success");
     } catch (e) {
-      toastError(e, "Export failed. Check your bucket name and credentials.");
+      toastError(e, "Export failed. Check the bucket name and credentials.");
     } finally {
       setExporting(false);
     }
@@ -435,8 +461,8 @@ export default function FileCard({ item }: { item: FileItem }) {
             <div className="fc-panel">
               <div className="fc-panel-header">
                 <div>
-                  <div className="fc-panel-title">Export to Cloud Storage</div>
-                  <div className="fc-panel-desc">Send your file to AWS S3, Cloudflare R2, Supabase, Google Drive, or Dropbox</div>
+                  <div className="fc-panel-title">Send to cloud storage</div>
+                  <div className="fc-panel-desc">Push this file straight into your own S3, R2, B2, or Supabase bucket</div>
                 </div>
                 <Button variant="secondary" size="sm" onClick={() => setShowExport(!showExport)}>
                   {showExport ? "Hide Target" : "Configure Destination"}
@@ -456,15 +482,59 @@ export default function FileCard({ item }: { item: FileItem }) {
                       </button>
                     ))}
                   </div>
-                  <div className="fc-export-row">
+                  <div className="fc-cred-grid">
                     <input
                       value={exportBucket}
                       onChange={(e) => setExportBucket(e.target.value)}
-                      placeholder={DESTINATIONS.find((d) => d.id === exportProvider)?.placeholder ?? "target-name"}
+                      placeholder={DESTINATIONS.find((d) => d.id === exportProvider)?.placeholder ?? "bucket-name"}
                       className="fc-export-input"
+                      aria-label="Bucket name"
                     />
+                    <input
+                      value={exportRegion}
+                      onChange={(e) => setExportRegion(e.target.value)}
+                      placeholder="us-east-1"
+                      className="fc-export-input"
+                      aria-label="Region"
+                    />
+                    <input
+                      value={exportAccessKey}
+                      onChange={(e) => setExportAccessKey(e.target.value)}
+                      placeholder="Access key"
+                      className="fc-export-input"
+                      autoComplete="off"
+                      spellCheck={false}
+                      aria-label="Access key"
+                    />
+                    <input
+                      value={exportSecretKey}
+                      onChange={(e) => setExportSecretKey(e.target.value)}
+                      placeholder="Secret key"
+                      className="fc-export-input"
+                      type="password"
+                      autoComplete="off"
+                      aria-label="Secret key"
+                    />
+                    {exportProvider !== "s3" && (
+                      <input
+                        value={exportEndpoint}
+                        onChange={(e) => setExportEndpoint(e.target.value)}
+                        placeholder="Endpoint URL (e.g. https://<account>.r2.cloudflarestorage.com)"
+                        className="fc-export-input fc-cred-full"
+                        autoComplete="off"
+                        spellCheck={false}
+                        aria-label="Endpoint URL"
+                      />
+                    )}
+                  </div>
+
+                  <p className="fc-cred-note">
+                    Used once to move this file, then discarded. Nothing is stored on our servers.
+                  </p>
+
+                  <div className="fc-export-row">
                     <Button variant="primary" size="sm" onClick={handleDestinationExport} disabled={exporting}>
-                      {exporting ? "Exporting..." : "Send File"}
+                      {exporting ? "Sending..." : "Send file"}
                     </Button>
                   </div>
                   {exportedUrl && (

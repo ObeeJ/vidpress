@@ -92,7 +92,14 @@ export async function getTranscription(id: string) {
 export async function exportToDestination(
   jobId: string,
   provider: string,
-  options?: { bucket?: string; endpoint?: string; targetPath?: string }
+  options: {
+    bucket?: string;
+    endpoint?: string;
+    region?: string;
+    accessKey?: string;
+    secretKey?: string;
+    targetPath?: string;
+  },
 ) {
   const r = await fetch(`${API}/export`, {
     method: "POST",
@@ -100,9 +107,20 @@ export async function exportToDestination(
     body: JSON.stringify({
       job_id: jobId,
       provider,
-      bucket: options?.bucket,
-      endpoint: options?.endpoint,
-      target_path: options?.targetPath,
+      // Must be a nested `destination` object — the server deserializes this
+      // into a DestinationConfig. Flat bucket/endpoint keys at the top level
+      // are ignored, which is why export previously always failed with
+      // "no destination configured for this job". Credentials are used for
+      // this single transfer and are never persisted server-side.
+      destination: {
+        provider,
+        bucket: options.bucket,
+        endpoint: options.endpoint,
+        region: options.region,
+        access_key: options.accessKey,
+        secret_key: options.secretKey,
+        target_path: options.targetPath,
+      },
     }),
   });
   if (!r.ok) throw new Error(await r.text());

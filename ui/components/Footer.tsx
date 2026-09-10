@@ -8,7 +8,7 @@ export default function Footer() {
         <div className="footer-top">
           <div className="footer-brand">
             <Link href="/" style={{ textDecoration: "none" }}>
-              <TheflateLogo />
+              <TheflateLogo interactive />
             </Link>
             <p className="footer-tagline">
               Compress, convert, and share media instantly. No account required.

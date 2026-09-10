@@ -1033,6 +1033,26 @@ p { text-wrap: pretty; }
 .fc-stat-signal { color: var(--color-signal); }
 .fc-pt-1 { padding-top: var(--spacing-1); }
 .fc-pill-no-transform { text-transform: none; }
+/* Credential fields pair up on wide cards and stack on narrow ones. The
+   inputs are flex:1 by default, which collapses them in a grid — width:100%
+   here lets the grid do the sizing instead. */
+.fc-cred-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-2);
+}
+
+.fc-cred-grid .fc-export-input { width: 100%; flex: none; }
+
+.fc-cred-full { grid-column: 1 / -1; }
+
+.fc-cred-note {
+  font-size: var(--text-2xs);
+  color: var(--color-fg-3);
+  margin-bottom: var(--spacing-3);
+}
+
 .fc-export-row { display: flex; gap: var(--spacing-2); }
 .fc-export-link { color: #10b981; font-weight: 700; }
 
@@ -2609,15 +2629,22 @@ p { text-wrap: pretty; }
   cursor: pointer;
 }
 
-.logo-mark-interactive:hover .logo-prefix {
+/* :active is paired with every :hover below because touch devices never fire
+   hover — without it the mark is completely inert on a phone. Tapping gives
+   the same gesture. */
+
+.logo-mark-interactive:hover .logo-prefix,
+.logo-mark-interactive:active .logo-prefix {
   color: var(--color-fg);
 }
 
-.logo-mark-interactive:hover .logo-suffix {
+.logo-mark-interactive:hover .logo-suffix,
+.logo-mark-interactive:active .logo-suffix {
   color: var(--color-signal);
 }
 
-.logo-mark-interactive:hover .logo-dot {
+.logo-mark-interactive:hover .logo-dot,
+.logo-mark-interactive:active .logo-dot {
   transform: scale(1.3) translateY(-1px);
 }
 
@@ -2663,12 +2690,17 @@ p { text-wrap: pretty; }
   transition: transform var(--dur-2) var(--ease-out);
 }
 
-.wordmark:hover .wordmark-prefix { color: var(--color-fg); }
-.wordmark:hover .wordmark-dot { transform: scale(1.3) translateY(-1px); }
+/* :active carries the gesture on touch, where :hover never fires. */
+.wordmark:hover .wordmark-prefix,
+.wordmark:active .wordmark-prefix { color: var(--color-fg); }
+
+.wordmark:hover .wordmark-dot,
+.wordmark:active .wordmark-dot { transform: scale(1.3) translateY(-1px); }
 
 @media (prefers-reduced-motion: reduce) {
   .wordmark-dot { transition: none; }
-  .wordmark:hover .wordmark-dot { transform: none; }
+  .wordmark:hover .wordmark-dot,
+  .wordmark:active .wordmark-dot { transform: none; }
 }
 
 /* ---------------------------------------------------------------------------

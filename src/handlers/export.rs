@@ -1,6 +1,6 @@
 use glideapi::{FromRequest, Request, Response, State};
 use glideapi_macros::post;
-use crate::{auth::auth_and_rate, db::get_job_for, handlers::analyze::json_err, jobs::model::JobStatus, state::AppState};
+use crate::{auth::auth_and_rate, db::get_job_for, handlers::analyze::json_err, jobs::model::{DestinationConfig, JobStatus}, state::AppState};
 
 #[post("/export")]
 pub async fn export(req: Request) -> Response {
@@ -31,9 +31,21 @@ pub async fn export(req: Request) -> Response {
 
     let remote_url = match provider {
         "s3" | "r2" | "b2" | "supabase" => {
+            // A destination attached at /upload time wins. Otherwise accept one
+            // inline on this request: that lets a caller export a job they
+            // queued without credentials, which is the flow the UI uses.
+            // Keys sent this way are scoped to this single transfer and are
+            // never written to the database (db.rs strips them on persist), so
+            // nothing here may log `cfg` or echo it back in the response.
             let cfg = match dest {
                 Some(d) => d,
-                None => return json_err(400, "no destination configured for this job"),
+                None => match serde_json::from_value::<DestinationConfig>(body["destination"].clone()) {
+                    Ok(d) => d,
+                    Err(_) => return json_err(
+                        400,
+                        "no destination for this job attach one at /upload or pass `destination` here",
+                    ),
+                },
             };
             match crate::export::s3::upload(&cfg, &file_path).await {
                 Ok(url) => url,
