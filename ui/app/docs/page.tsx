@@ -4,7 +4,7 @@ import { useState } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
-const BASE = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:8080";
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://api.theflate.com";
 
 const MC: Record<string, string> = { GET: "#10b981", POST: "var(--color-fg)", DELETE: "#ef4444" };
 
@@ -133,7 +133,7 @@ export default function DocsPage() {
             <code style={{ fontSize: 14, color: "var(--color-fg)", fontWeight: 700, fontFamily: "monospace" }}>{BASE}</code>
           </div>
           <div style={{ fontSize: 12, color: "var(--color-fg-2)" }}>
-            Pass header: <code className="docs-inline-code">x-api-key: vp_YOUR_KEY</code>
+            Pass header: <code className="docs-inline-code">x-api-key: vp_YOUR_KEY</code> (optional for free tier)
           </div>
         </div>
 

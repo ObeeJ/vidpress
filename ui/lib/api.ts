@@ -1,4 +1,4 @@
-export const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+export const API = process.env.NEXT_PUBLIC_API_URL ?? "https://api.theflate.com";
 
 function headers(extra?: Record<string, string>): Record<string, string> {
   const key = typeof window !== "undefined"

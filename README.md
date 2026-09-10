@@ -42,12 +42,12 @@ bun run dev
 | `THEFLATE_STORAGE` | `/tmp/theflate_output` | Where compressed files are stored |
 | `THEFLATE_DB` | `/tmp/theflate.db` | SQLite database path |
 | `THEFLATE_CODEC` | `libx265` | Codec for software target_mb jobs (`libx265` default, `libx264`/`h264` fallback) |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | Backend API base URL |
+| `NEXT_PUBLIC_API_URL` | `https://api.theflate.com` | Backend API base URL |
 | `NEXT_PUBLIC_BASE_URL` | `http://localhost:3000` | Public URL for QR codes and sharing |
 
 ## API
 
-Base URL: `http://localhost:8080`
+Base URL: `https://api.theflate.com`
 
 All requests accept `x-api-key: vp_YOUR_KEY` header. Anonymous requests are rate-limited to 10/min per IP.
 
