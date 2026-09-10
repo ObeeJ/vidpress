@@ -14,10 +14,14 @@ fn num_cpus() -> String {
     std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2).to_string()
 }
 
-fn target_mb_codec() -> &'static str {
+/// Codec name plus its own `-preset` value — x264/x265 use named presets
+/// ("medium"), SVT-AV1 uses a numeric one (0=slowest/best..13=fastest; 6 is
+/// AV1's own documented balance point, distinct from x264/x265's "medium").
+fn target_mb_codec() -> (&'static str, &'static str) {
     match std::env::var("THEFLATE_CODEC").as_deref() {
-        Ok("h264") | Ok("libx264") => "libx264",
-        _ => "libx265",
+        Ok("h264") | Ok("libx264") => ("libx264", "medium"),
+        Ok("av1") | Ok("libsvtav1") => ("libsvtav1", "6"),
+        _ => ("libx265", "medium"),
     }
 }
 
@@ -138,13 +142,13 @@ pub async fn run(
             _ => None,
         };
 
-        let codec = target_mb_codec();
+        let (codec, codec_preset) = target_mb_codec();
         let passlogfile = format!("{}/{id}_passlog", crate::state::storage_dir());
         let null_output = if cfg!(windows) { "NUL" } else { "/dev/null" };
 
         let mut pass1_args: Vec<String> = vec![
             "-y".into(), "-threads".into(), num_cpus(), "-i".into(), input.clone(),
-            "-c:v".into(), codec.into(), "-preset".into(), "medium".into(),
+            "-c:v".into(), codec.into(), "-preset".into(), codec_preset.into(),
             "-b:v".into(), format!("{video_kbps}k"),
         ];
         if let Some(ref f) = scale_filter {
@@ -202,7 +206,7 @@ pub async fn run(
 
         let mut pass2_args: Vec<String> = vec![
             "-y".into(), "-threads".into(), num_cpus(), "-i".into(), input.clone(),
-            "-c:v".into(), codec.into(), "-preset".into(), "medium".into(),
+            "-c:v".into(), codec.into(), "-preset".into(), codec_preset.into(),
             "-b:v".into(), format!("{video_kbps}k"),
         ];
         if let Some(ref f) = scale_filter {
