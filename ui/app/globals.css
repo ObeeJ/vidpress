@@ -1658,10 +1658,10 @@ p { text-wrap: pretty; }
   --color-fg-2:       #737373;   /* muted text → Fog */
   --color-fg-3:       #a3a3a3;   /* placeholder → Silver */
 
-  /* --- signal: electric blue replaces acid lime --------------------------- */
-  --color-signal:     #2563eb;   /* Electric Blue — the one moment of voltage */
-  --color-signal-dim: #1e40af;   /* Deep Sapphire */
-  --color-on-signal:  #f5f5f5;   /* text on blue */
+  /* --- signal: acid lime matching dark mode ------------------------------- */
+  --color-signal:     #C9F24E;   /* Acid Lime — signature brand voltage */
+  --color-signal-dim: #94b829;   /* Dimmed Lime */
+  --color-on-signal:  #171717;   /* dark text on lime */
 
   --color-warn:       #ea580c;   /* Tangerine */
   --color-danger:     #ef4444;   /* red */
@@ -1676,8 +1676,8 @@ p { text-wrap: pretty; }
 
 /* selection highlight */
 [data-theme="light"] ::selection {
-  background: #2563eb;
-  color: #f5f5f5;
+  background: #C9F24E;
+  color: #171717;
 }
 
 /* scrollbar */
@@ -1688,9 +1688,9 @@ p { text-wrap: pretty; }
 }
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #d4d4d4; }
 
-/* focus ring: blue on light */
+/* focus ring: lime on light */
 [data-theme="light"] :focus-visible {
-  outline-color: #2563eb;
+  outline-color: #C9F24E;
 }
 
 /* --- light-specific component overrides ----------------------------------- */
@@ -1701,15 +1701,15 @@ p { text-wrap: pretty; }
   border-bottom-color: #e5e5e5;
 }
 
-/* Primary button: black fill on light (Dub's primary action fill) */
+/* Primary button: lime fill with black text on light */
 [data-theme="light"] .btn-primary {
-  --btn-bg: #171717;
-  --btn-fg: #f5f5f5;
-  --btn-line: #171717;
+  --btn-bg: #C9F24E;
+  --btn-fg: #171717;
+  --btn-line: #C9F24E;
 }
 [data-theme="light"] .btn-primary:hover {
-  background: #222222;
-  border-color: #222222;
+  background: #D6FF62;
+  border-color: #D6FF62;
 }
 
 /* Secondary button: white with ash border */
@@ -1770,13 +1770,13 @@ p { text-wrap: pretty; }
 
 /* DropZone */
 [data-theme="light"] .dropzone { background: #f5f5f5; border-color: #e5e5e5; }
-[data-theme="light"] .dropzone-drag { background: #f5f5f5; border-color: #2563eb; }
+[data-theme="light"] .dropzone-drag { background: #f5f5f5; border-color: #C9F24E; }
 [data-theme="light"] .dropzone-icon { background: #f5f5f5; border-color: #e5e5e5; color: #171717; }
 [data-theme="light"] .dropzone-primary { color: #171717; }
-[data-theme="light"] .dropzone-primary-drag { color: #2563eb; }
+[data-theme="light"] .dropzone-primary-drag { color: #171717; }
 [data-theme="light"] .dropzone-secondary { color: #737373; }
 [data-theme="light"] .dropzone-fmt-badge { background: #f5f5f5; border-color: #e5e5e5; }
-[data-theme="light"] .dropzone:focus-within { outline-color: #2563eb; }
+[data-theme="light"] .dropzone:focus-within { outline-color: #C9F24E; }
 
 /* Tab bar */
 [data-theme="light"] .tablist { background: #f5f5f5; border-color: #e5e5e5; }
@@ -1793,7 +1793,7 @@ p { text-wrap: pretty; }
 [data-theme="light"] .ud-input { background: #f5f5f5; border-color: #171717; color: #171717; }
 [data-theme="light"] .ud-input:focus { border-color: #171717; }
 [data-theme="light"] .ud-status { background: #f5f5f5; border-color: #e5e5e5; }
-[data-theme="light"] .ud-status-dot { background: #2563eb; }
+[data-theme="light"] .ud-status-dot { background: #C9F24E; }
 [data-theme="light"] .ud-media-frame { border-color: #e5e5e5; }
 [data-theme="light"] .ud-stop-btn { border-color: #ef4444; background: rgba(239,68,68,0.08); color: #ef4444; }
 
@@ -1813,10 +1813,10 @@ p { text-wrap: pretty; }
 [data-theme="light"] .pf-tr { border-bottom-color: #f5f5f5; }
 [data-theme="light"] .pf-td-signal { color: #16a34a; }
 
-/* Indeterminate track sweep: blue on light */
+/* Indeterminate track sweep: lime on light */
 [data-theme="light"] .track { background: #f5f5f5; }
 [data-theme="light"] .track::after {
-  background: linear-gradient(90deg, transparent, #2563eb, transparent);
+  background: linear-gradient(90deg, transparent, #C9F24E, transparent);
 }
 
 /* Navbar links */
@@ -1966,19 +1966,19 @@ p { text-wrap: pretty; }
 .logo-mark {
   display: flex;
   align-items: center;
-  gap: 10px;
 }
 
 .logo-wordmark {
-  font-size: 18px;
-  letter-spacing: -0.6px;
+  font-size: 20px;
+  letter-spacing: -0.7px;
   display: inline-flex;
   align-items: center;
+  user-select: none;
 }
 
 .logo-prefix {
   color: var(--color-muted);
-  font-weight: 600;
+  font-weight: 500;
   transition: color var(--dur-1) var(--ease-out);
 }
 
@@ -1988,29 +1988,14 @@ p { text-wrap: pretty; }
   transition: color var(--dur-1) var(--ease-out);
 }
 
-.logo-svg {
-  transition: transform var(--dur-2) var(--ease-snap);
-  will-change: transform;
-}
-
-.logo-ghost-frame,
-.logo-flat-core {
-  transition: all var(--dur-2) var(--ease-out);
+.logo-dot {
+  color: var(--color-signal);
+  font-weight: 900;
+  transition: transform var(--dur-2) var(--ease-out);
 }
 
 .logo-mark-interactive {
   cursor: pointer;
-}
-
-/* Hover: 2D frame compresses inward toward the solid neon core */
-.logo-mark-interactive:hover .logo-ghost-frame {
-  stroke-opacity: 0.8;
-  stroke-dasharray: 2 1;
-}
-
-.logo-mark-interactive:hover .logo-flat-core {
-  transform: scaleX(1.1);
-  transform-origin: center;
 }
 
 .logo-mark-interactive:hover .logo-prefix {
@@ -2021,9 +2006,13 @@ p { text-wrap: pretty; }
   color: var(--color-signal);
 }
 
+.logo-mark-interactive:hover .logo-dot {
+  transform: scale(1.3) translateY(-1px);
+}
+
 /* Press: snap down like a physical key */
-.logo-mark-pressed .logo-svg {
-  transform: scale(0.9) translateY(1px) !important;
+.logo-mark-pressed {
+  transform: scale(0.96);
 }
 
 /* ---------------------------------------------------------------------------

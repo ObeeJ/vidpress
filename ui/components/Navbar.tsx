@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 export function TheflateLogo({ interactive = false }: { interactive?: boolean }) {
   const [pressed, setPressed] = useState(false);
 
-  // The logo: a 2D flat container frame deflating into a compact solid neon core.
+  // Pure minimalist typographic wordmark: "theflate."
   return (
     <div
       className={`logo-mark${interactive ? " logo-mark-interactive" : ""}${pressed ? " logo-mark-pressed" : ""}`}
@@ -15,27 +15,10 @@ export function TheflateLogo({ interactive = false }: { interactive?: boolean })
       onMouseUp={() => interactive && setPressed(false)}
       onMouseLeave={() => interactive && setPressed(false)}
     >
-      <svg
-        width="28"
-        height="28"
-        viewBox="0 0 32 32"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="logo-svg"
-        aria-label="theflate — media compression engine"
-      >
-        {/* Background tile */}
-        <rect width="32" height="32" rx="7" fill="#171717" />
-
-        {/* Ghosted outer 2D frame (original dimensions) */}
-        <rect x="7" y="7" width="18" height="18" rx="3" stroke="#C9F24E" strokeWidth="1.6" strokeDasharray="3 2" strokeOpacity="0.35" fill="none" className="logo-ghost-frame" />
-
-        {/* Solid compressed 2D inner bar (deflated core) */}
-        <rect x="10" y="14" width="12" height="4" rx="2" fill="#C9F24E" className="logo-flat-core" />
-      </svg>
       <span className="logo-wordmark">
         <span className="logo-prefix">the</span>
         <span className="logo-suffix">flate</span>
+        <span className="logo-dot">.</span>
       </span>
     </div>
   );

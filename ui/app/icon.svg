@@ -1,7 +1,5 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="32" height="32" rx="7" fill="#171717"/>
-  <!-- Ghosted outer 2D frame (original file dimension) -->
-  <rect x="7" y="7" width="18" height="18" rx="3" stroke="#C9F24E" stroke-width="1.6" stroke-dasharray="3 2" stroke-opacity="0.35" fill="none"/>
-  <!-- Solid compressed 2D inner bar (deflated core) -->
-  <rect x="10" y="14" width="12" height="4" rx="2" fill="#C9F24E"/>
+  <text x="14" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-weight="900" font-size="18" fill="#FFFFFF" text-anchor="middle">f</text>
+  <circle cx="22" cy="21" r="2" fill="#C9F24E"/>
 </svg>
