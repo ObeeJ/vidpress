@@ -5,7 +5,14 @@ use tokio_tungstenite::{connect_async, tungstenite::{Message, client::IntoClient
 // process's own THEFLATE_CORS_ORIGIN decides the allowed Origin below) rather
 // than spawning a second one, since ws.rs binds a fixed, non-configurable
 // port and two listeners can't share it.
+// Ignored by default: this is the one test that needs a live server rather
+// than building its own, because ws.rs binds a hard-coded port that a second
+// listener can't share. Leaving it in the default run makes `cargo test` fail
+// on any machine that doesn't happen to have the dev server up.
+//
+//   cargo test --test ws_live_stream -- --ignored
 #[tokio::test]
+#[ignore = "requires a running theflate server on :8081"]
 async fn test_ws_live_stream_handshake_and_chunk_upload() {
     let mut req = "ws://127.0.0.1:8081".into_client_request().expect("build request");
     req.headers_mut().insert("origin", "http://localhost:3000".parse().unwrap());

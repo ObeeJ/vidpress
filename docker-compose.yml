@@ -7,6 +7,10 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+      # ws::listen binds 8081 inside the same process for live-stream
+      # recording. Without this mapping the feature is unreachable from the
+      # host and the browser's WebSocket connect simply times out.
+      - "8081:8081"
     environment:
       - THEFLATE_STORAGE=/tmp/theflate_output
       - THEFLATE_DB=/var/lib/theflate/theflate.db
@@ -19,13 +23,19 @@ services:
     build:
       context: ./ui
       dockerfile: Dockerfile
+      # These MUST be build args, not runtime environment. next build inlines
+      # every NEXT_PUBLIC_* value into the client bundle, so a runtime env var
+      # arrives far too late to change where the browser sends its requests.
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+        NEXT_PUBLIC_BASE_URL: http://localhost:3000
+        NEXT_PUBLIC_WS_URL: ws://localhost:8081
     container_name: theflate-ui
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_BASE_URL=http://localhost:3000
-      - NEXT_PUBLIC_API_URL=http://localhost:8080
+      - HOSTNAME=0.0.0.0
     depends_on:
       - theflate-api
 
