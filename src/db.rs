@@ -190,6 +190,34 @@ pub fn get_job_for(db: &Db, id: &str, caller: Option<&str>) -> Option<Job> {
     }
 }
 
+/// Mark jobs that were running when the process died as failed.
+///
+/// Job state lives in SQLite but the work happens in child ffmpeg and yt-dlp
+/// processes owned by this process. When the server stops - a deploy, a crash,
+/// a reboot - those children die with it, while their rows remain `queued` or
+/// `processing` forever. The UI then shows a progress bar that can never move,
+/// with no error and no way for the user to tell the job is already dead.
+///
+/// Nothing can legitimately be in flight at startup: this runs before any job
+/// is spawned, so any such row is by definition an orphan from a previous
+/// life. Returning the count lets the caller log how many were swept, which is
+/// the signal that a restart interrupted real work.
+pub fn reconcile_interrupted_jobs(conn: &Connection) -> usize {
+    match conn.execute(
+        "UPDATE jobs SET status = 'failed', eta_secs = 0
+         WHERE status IN ('queued', 'processing')",
+        [],
+    ) {
+        Ok(n) => n,
+        Err(e) => {
+            // A failure here must not stop the server booting - stale rows are
+            // a cosmetic problem, an unstartable server is not.
+            tracing::error!("could not reconcile interrupted jobs: {e}");
+            0
+        }
+    }
+}
+
 pub fn load_all_jobs(conn: &Connection) -> Vec<Job> {
     let mut stmt = match conn.prepare(JOB_SELECT) {
         Ok(s) => s,

@@ -13,6 +13,14 @@ async fn main() {
     let conn = Connection::open(db_path()).expect("cannot open db");
     db::init_db(&conn);
 
+    // Must run before load_all_jobs, so the in-memory map never inherits a job
+    // marked running that has no process behind it. Anything still in flight
+    // here belongs to a previous process that is already gone.
+    let swept = db::reconcile_interrupted_jobs(&conn);
+    if swept > 0 {
+        tracing::warn!("marked {swept} interrupted job(s) as failed after restart");
+    }
+
     let jobs_map: HashMap<_, _> = db::load_all_jobs(&conn)
         .into_iter()
         .map(|j| (j.id.clone(), j))
