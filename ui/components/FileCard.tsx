@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useStore, FileItem } from "@/lib/store";
-import { ingestFile, analyzeFile, uploadFile, downloadFile, getJob, transcribeFile, getTranscription, exportToDestination, API } from "@/lib/api";
+import { ingestFile, analyzeFile, uploadFile, downloadFile, getJob, transcribeFile, getTranscription, exportToDestination, API, TargetTooSmallError } from "@/lib/api";
+import type { CodecOption } from "@/lib/api";
 import { QRCodeSVG } from "qrcode.react";
 import { toast, toastError } from "@/lib/toast";
 import Button from "@/components/primitives/Button";
@@ -92,6 +93,12 @@ export default function FileCard({ item }: { item: FileItem }) {
   const [exportAccessKey, setExportAccessKey] = useState("");
   const [exportSecretKey, setExportSecretKey] = useState("");
   const [exportEndpoint, setExportEndpoint] = useState("");
+  // Populated from the server's response: which codecs this container can
+  // actually hold, and what it predicts the chosen size will look like.
+  const [codecOptions, setCodecOptions] = useState<CodecOption[]>([]);
+  const [selectedCodec, setSelectedCodec] = useState("");
+  const [qualityWarning, setQualityWarning] = useState<string | null>(null);
+  const [tooSmall, setTooSmall] = useState<TargetTooSmallError | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportedUrl, setExportedUrl] = useState<string | null>(null);
 
@@ -159,19 +166,34 @@ export default function FileCard({ item }: { item: FileItem }) {
   const outputUrl = job?.status === "done" ? `${API}/download/${job.id}` : null;
   const shareUrl = job?.status === "done" ? `${BASE_URL}/download/${job.id}` : null;
 
-  async function theflate() {
+  async function theflate(force = false) {
     if (!item.ingestId) return;
     try {
-      const { job_id } = await uploadFile(
+      const res = await uploadFile(
         item.ingestId,
         selectedPreset === "original" ? undefined : selectedPreset,
         undefined,
         selectedFormat !== profile?.output_ext ? selectedFormat : undefined,
         selectedPreset === "original" ? targetMb : undefined,
+        selectedCodec || undefined,
+        force || undefined,
       );
-      setJobId(item.localUrl, job_id);
+      // The server is authoritative on what this container can hold, so the
+      // picker is populated from its answer rather than a guess made here.
+      setCodecOptions(res.codec_options ?? []);
+      // A job can start and still be headed for a poor result; say so plainly
+      // rather than letting it be discovered on playback.
+      setQualityWarning(res.quality?.warning ?? null);
+      setTooSmall(null);
+      setJobId(item.localUrl, res.job_id);
       toast("Compression started", "info");
     } catch (e) {
+      // Not a failure - a refusal carrying the numbers needed to choose again.
+      if (e instanceof TargetTooSmallError) {
+        setTooSmall(e);
+        if (e.codecOptions.length) setCodecOptions(e.codecOptions);
+        return;
+      }
       const msg = e instanceof Error && e.message.length < 120 ? e.message.replace(/^Error:\s*/i, "") : "Couldn't start compression. Try again.";
       setError(item.localUrl, msg);
       toastError(e, "Couldn't start compression. Try again.");
@@ -393,9 +415,67 @@ export default function FileCard({ item }: { item: FileItem }) {
           </div>
         )}
 
+        {/* Codec picker - options come from the server, which is the side that
+            knows what this container can actually hold. Rendered only once a
+            compression attempt has told us, so it never guesses. */}
+        {profile && !job && codecOptions.length > 1 && (
+          <div className="fc-field">
+            <label className="fc-label" htmlFor={`codec-${item.localUrl}`}>
+              Codec
+            </label>
+            <select
+              id={`codec-${item.localUrl}`}
+              className="fc-select"
+              value={selectedCodec}
+              onChange={(e) => setSelectedCodec(e.target.value)}
+            >
+              <option value="">Default ({codecOptions[0]?.label})</option>
+              {codecOptions.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* The server predicted a poor result but started the job anyway. */}
+        {qualityWarning && (
+          <p className="fc-quality-warning" role="status">
+            {qualityWarning}
+          </p>
+        )}
+
+        {/* A refusal, not an error: the target cannot produce a watchable file.
+            Both ways out are offered - a size that works, or proceeding with
+            eyes open - because only the user knows which they need. */}
+        {tooSmall && (
+          <div className="fc-too-small" role="alert">
+            <p className="fc-too-small-msg">{tooSmall.message}</p>
+            <div className="fc-too-small-actions">
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => {
+                  setTargetMb(item.localUrl, Math.ceil(tooSmall.minRecommendedMb));
+                  setTooSmall(null);
+                }}
+              >
+                Use {Math.ceil(tooSmall.minRecommendedMb)} MB instead
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => theflate(true)}>
+                Compress anyway
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Compress Button */}
         {profile && !job && (
-          <Button variant="primary" onClick={theflate} className="fc-btn-full">
+          // Wrapped rather than passed directly: theflate's first parameter is
+          // `force`, and a click event is truthy, so onClick={theflate} would
+          // silently force past the quality gate on every single compression.
+          <Button variant="primary" onClick={() => theflate()} className="fc-btn-full">
             Compress →
           </Button>
         )}

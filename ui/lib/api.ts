@@ -42,13 +42,104 @@ export async function analyzeFile(ingestId: string) {
   return r.json();
 }
 
-export async function uploadFile(ingestId: string, preset?: string, webhookUrl?: string, outputFormat?: string, targetMb?: number) {
+/** One codec the chosen container can actually hold. Mirrors CodecChoice in
+ *  src/media/codec_compat.rs - the server decides what is legal, because it is
+ *  the side that has to make ffmpeg accept it. */
+export type CodecOption = {
+  id: string;
+  video: string;
+  audio: string;
+  label: string;
+  speed: "fast" | "balanced" | "slow";
+};
+
+/** The server's prediction of what a target size will look like, from
+ *  src/media/quality.rs. `warning` is non-null only when quality will suffer. */
+export type QualityInfo = {
+  tier: "good" | "acceptable" | "poor" | "unusable";
+  predicted_height: number;
+  source_height: number;
+  predicted_video_kbps: number;
+  min_recommended_mb: number;
+  warning: string | null;
+};
+
+export type UploadResult = {
+  job_id: string;
+  status: string;
+  estimated_time_secs: number;
+  codec_options: CodecOption[];
+  quality?: QualityInfo;
+};
+
+/** Thrown when the server refuses a target size as unachievable. Carries the
+ *  server's numbers so the UI can offer a workable size instead of a bare
+ *  error string - the point of the pre-flight check is that the user decides
+ *  with real figures in front of them. */
+export class TargetTooSmallError extends Error {
+  readonly minRecommendedMb: number;
+  readonly predictedHeight: number;
+  readonly predictedVideoKbps: number;
+  readonly codecOptions: CodecOption[];
+
+  constructor(d: {
+    message: string;
+    min_recommended_mb: number;
+    predicted_height: number;
+    predicted_video_kbps: number;
+    codec_options?: CodecOption[];
+  }) {
+    super(d.message);
+    this.name = "TargetTooSmallError";
+    this.minRecommendedMb = d.min_recommended_mb;
+    this.predictedHeight = d.predicted_height;
+    this.predictedVideoKbps = d.predicted_video_kbps;
+    this.codecOptions = d.codec_options ?? [];
+  }
+}
+
+export async function uploadFile(
+  ingestId: string,
+  preset?: string,
+  webhookUrl?: string,
+  outputFormat?: string,
+  targetMb?: number,
+  codec?: string,
+  force?: boolean,
+): Promise<UploadResult> {
   const r = await fetch(`${API}/upload`, {
     method: "POST",
     headers: headers({ "content-type": "application/json" }),
-    body: JSON.stringify({ ingest_id: ingestId, preset, webhook_url: webhookUrl, output_format: outputFormat, target_mb: targetMb }),
+    body: JSON.stringify({
+      ingest_id: ingestId,
+      preset,
+      webhook_url: webhookUrl,
+      output_format: outputFormat,
+      target_mb: targetMb,
+      codec,
+      force,
+    }),
   });
-  if (!r.ok) throw new Error(await r.text());
+
+  if (!r.ok) {
+    const raw = await r.text();
+    // A 400 target_too_small is a structured refusal rather than a failure, so
+    // it becomes a typed error the UI can act on. Anything that does not parse
+    // falls through to the raw text - an unexpected error body must not be
+    // swallowed into a misleading message.
+    let typed: Error | null = null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.error === "target_too_small") {
+        typed = new TargetTooSmallError(parsed);
+      } else if (typeof parsed?.message === "string") {
+        typed = new Error(parsed.message);
+      }
+    } catch {
+      // Not JSON; fall through to the raw body below.
+    }
+    throw typed ?? new Error(raw);
+  }
   return r.json();
 }
 

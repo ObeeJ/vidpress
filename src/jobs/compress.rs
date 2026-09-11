@@ -178,7 +178,9 @@ pub async fn run(
         };
 
         let choice = codec_for_output(&output);
-        let (codec, codec_preset) = (choice.video, choice.preset);
+        // Only the encoder name is taken here; the speed setting comes from
+        // choice.preset_args(), which knows libvpx spells it -cpu-used.
+        let codec = choice.video;
         let passlogfile = format!("{}/{id}_passlog", crate::state::storage_dir());
         let null_output = if cfg!(windows) { "NUL" } else { "/dev/null" };
 

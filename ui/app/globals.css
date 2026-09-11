@@ -1033,6 +1033,84 @@ p { text-wrap: pretty; }
 .fc-stat-signal { color: var(--color-signal); }
 .fc-pt-1 { padding-top: var(--spacing-1); }
 .fc-pill-no-transform { text-transform: none; }
+
+/* Codec picker and quality messaging.
+   The refusal panel is amber rather than red on purpose: the target is not an
+   error, it is a choice with a consequence, and both ways out are offered. */
+.fc-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.fc-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-fg-2);
+}
+
+.fc-select {
+  width: 100%;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: var(--color-surface-2);
+  color: var(--color-fg);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.fc-select:hover { border-color: var(--color-line-lit); }
+
+/* Never remove the focus ring without replacing it with something visible. */
+.fc-select:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+  border-color: var(--color-signal);
+}
+
+.fc-quality-warning {
+  margin: 0;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: color-mix(in srgb, var(--color-warn) 10%, transparent);
+  border-left: 2px solid var(--color-warn);
+  border-radius: 0 4px 4px 0;
+  color: var(--color-fg);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.fc-too-small {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-warn);
+  border-radius: 8px;
+}
+
+.fc-too-small-msg {
+  margin: 0;
+  color: var(--color-fg);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+/* Wraps rather than overflowing at 375px. */
+.fc-too-small-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fc-select { transition: none; }
+}
 /* Credential fields pair up on wide cards and stack on narrow ones. The
    inputs are flex:1 by default, which collapses them in a grid — width:100%
    here lets the grid do the sizing instead. */
