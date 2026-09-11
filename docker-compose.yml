@@ -5,6 +5,14 @@ services:
       dockerfile: Dockerfile
     container_name: theflate-api
     restart: unless-stopped
+    # x265 asks the kernel for NUMA-aware thread placement via set_mempolicy().
+    # Docker's default seccomp profile denies that syscall, so every encode
+    # prints a wall of "set_mempolicy: Operation not permitted" before any real
+    # output. The encode itself is unaffected - x265 falls back to default
+    # allocation, and on a single-socket machine the two are equivalent -
+    # SYS_NICE simply lets the call succeed and keeps the logs readable.
+    cap_add:
+      - SYS_NICE
     ports:
       - "8080:8080"
       # ws::listen binds 8081 inside the same process for live-stream

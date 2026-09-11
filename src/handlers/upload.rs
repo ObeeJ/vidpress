@@ -58,10 +58,58 @@ pub async fn upload(req: Request) -> Response {
         profile.estimated_time_secs *= 2;
     }
 
+    // Predict what this target size will actually look like before spending any
+    // CPU on it. Target-size compression is arithmetic - a size and a duration
+    // fix the bitrate - so an impossible ask can be answered immediately rather
+    // than after minutes of encoding that ends in a 144p result nobody wanted.
+    //
+    // `force` is the deliberate escape hatch: someone with a hard size limit
+    // may genuinely accept an ugly file, and this refuses to make that decision
+    // for them. It only ever blocks the Unusable tier; Poor still proceeds with
+    // its warning attached.
+    let force = body["force"].as_bool().unwrap_or(false);
+    let quality = target_mb.map(|mb| {
+        crate::media::quality::estimate(
+            mb,
+            profile.duration_secs,
+            // Dimensions are u64 on the profile; the estimator works in u32,
+            // which is ample for any real frame size.
+            profile.width.map(|v| v as u32),
+            profile.height.map(|v| v as u32),
+            None,
+        )
+    });
+
+    if let Some(ref q) = quality {
+        if q.tier.should_block() && !force {
+            return Response {
+                status: 400,
+                body: serde_json::json!({
+                    "error": "target_too_small",
+                    "message": q.warning.clone().unwrap_or_default(),
+                    "min_recommended_mb": (q.min_recommended_mb * 10.0).round() / 10.0,
+                    "predicted_height": q.output_height,
+                    "predicted_video_kbps": q.video_kbps,
+                    // Offering the alternatives here is the point: the caller
+                    // can retry with a workable size, pick a more efficient
+                    // codec, or repeat the request with force=true.
+                    "codec_options": crate::media::codec_compat::codecs_for(&profile.output_ext),
+                    "force_hint": "resend with \"force\": true to compress anyway",
+                })
+                .to_string()
+                .into(),
+                ..Default::default()
+            };
+        }
+    }
+
     let id = Uuid::new_v4().to_string();
     let out_dir = storage_dir();
     std::fs::create_dir_all(&out_dir).ok();
     let output_path = format!("{}/{}_output.{}", out_dir, id, profile.output_ext);
+    // Captured before `profile` is moved into the spawned job, so the response
+    // can still report which codecs this container accepts.
+    let output_ext = profile.output_ext.clone();
     let eta = profile.estimated_time_secs;
     let owner_key = caller.as_ref().map(|k| k.key.clone());
 
@@ -82,9 +130,33 @@ pub async fn upload(req: Request) -> Response {
         crate::jobs::compress::run(id2, path, output_path, profile, preset, target_mb, jobs, db, hw, sem).await;
     });
 
+    // Built with serde_json rather than format! so a warning string containing
+    // a quote or backslash cannot corrupt the payload.
+    let mut payload = serde_json::json!({
+        "job_id": id,
+        "status": "queued",
+        "estimated_time_secs": eta,
+        // Which codecs this container can actually accept, so a client can
+        // offer a real choice instead of guessing and failing at mux time.
+        "codec_options": crate::media::codec_compat::codecs_for(&output_ext),
+    });
+
+    // A Poor-tier job proceeds, but the caller is told plainly what it will
+    // look like rather than discovering it on playback.
+    if let Some(q) = quality {
+        payload["quality"] = serde_json::json!({
+            "tier": q.tier,
+            "predicted_height": q.output_height,
+            "source_height": q.source_height,
+            "predicted_video_kbps": q.video_kbps,
+            "min_recommended_mb": (q.min_recommended_mb * 10.0).round() / 10.0,
+            "warning": q.warning,
+        });
+    }
+
     Response {
         status: 202,
-        body: format!(r#"{{"job_id":"{id}","status":"queued","estimated_time_secs":{eta}}}"#).into(),
+        body: payload.to_string().into(),
         ..Default::default()
     }
 }

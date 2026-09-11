@@ -14,15 +14,32 @@ fn num_cpus() -> String {
     std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2).to_string()
 }
 
-/// Codec name plus its own `-preset` value - x264/x265 use named presets
-/// ("medium"), SVT-AV1 uses a numeric one (0=slowest/best..13=fastest; 6 is
-/// AV1's own documented balance point, distinct from x264/x265's "medium").
-fn target_mb_codec() -> (&'static str, &'static str) {
-    match std::env::var("THEFLATE_CODEC").as_deref() {
-        Ok("h264") | Ok("libx264") => ("libx264", "medium"),
-        Ok("av1") | Ok("libsvtav1") => ("libsvtav1", "6"),
-        _ => ("libx265", "medium"),
+/// Pick a codec that can actually be muxed into the output container.
+///
+/// This used to read THEFLATE_CODEC and return libx265 for anything it did not
+/// recognise, with no reference to the output file at all. For a `.webm`
+/// output that produced an HEVC-in-WebM pairing which ffmpeg rejects while
+/// writing the header - after pass 1 had already spent minutes encoding - so
+/// the job appeared to hang at 0% and then died with "encoded 0 frames".
+///
+/// Deferring to the container's own default when the requested codec does not
+/// fit also means a deployment-wide `THEFLATE_CODEC=h265` no longer breaks
+/// every webm job.
+fn codec_for_output(output: &str) -> crate::media::codec_compat::CodecChoice {
+    use crate::media::codec_compat;
+
+    let ext = std::path::Path::new(output)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("mp4");
+
+    let requested = codec_compat::env_codec_preference();
+    let resolution = codec_compat::resolve(ext, requested.as_deref());
+
+    if let Some(notice) = resolution.notice(ext) {
+        tracing::info!("codec substitution for {output}: {notice}");
     }
+    resolution.choice()
 }
 
 async fn cleanup_passlog_files(id: &str) {
@@ -58,6 +75,19 @@ pub async fn run(
             drop(store);
             upsert_job(&db, &job);
         }
+    };
+
+    // Progress as last reported by the polling task. Failure paths pass this
+    // to `update` instead of a literal 0: resetting to zero made a job that
+    // died at 49% indistinguishable from one that never started, so a crash
+    // looked exactly like a hang. Preserving it means "failed at 49%" reads as
+    // what it is.
+    let last_progress = || {
+        jobs.lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&id)
+            .map(|j| j.progress)
+            .unwrap_or(0)
     };
 
     let is_two_pass = target_mb.filter(|_| preset.is_none()).is_some()
@@ -147,15 +177,19 @@ pub async fn run(
             _ => None,
         };
 
-        let (codec, codec_preset) = target_mb_codec();
+        let choice = codec_for_output(&output);
+        let (codec, codec_preset) = (choice.video, choice.preset);
         let passlogfile = format!("{}/{id}_passlog", crate::state::storage_dir());
         let null_output = if cfg!(windows) { "NUL" } else { "/dev/null" };
 
         let mut pass1_args: Vec<String> = vec![
             "-y".into(), "-threads".into(), num_cpus(), "-i".into(), input.clone(),
-            "-c:v".into(), codec.into(), "-preset".into(), codec_preset.into(),
-            "-b:v".into(), format!("{video_kbps}k"),
+            "-c:v".into(), codec.into(),
         ];
+        // preset_args rather than a literal "-preset": libvpx-vp9 rejects
+        // -preset outright and needs -cpu-used instead.
+        pass1_args.extend(choice.preset_args());
+        pass1_args.extend(["-b:v".into(), format!("{video_kbps}k")]);
         if let Some(ref f) = scale_filter {
             pass1_args.push("-vf".into());
             pass1_args.push(f.clone());
@@ -178,7 +212,7 @@ pub async fn run(
                 progress_task.abort();
                 let _ = tokio::fs::remove_file(&progress_file).await;
                 cleanup_passlog_files(&id).await;
-                update(JobStatus::Failed, 0, 0, 0);
+                update(JobStatus::Failed, last_progress(), 0, 0);
                 jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
                 return;
             }
@@ -190,7 +224,7 @@ pub async fn run(
                 progress_task.abort();
                 let _ = tokio::fs::remove_file(&progress_file).await;
                 cleanup_passlog_files(&id).await;
-                update(JobStatus::Failed, 0, 0, 0);
+                update(JobStatus::Failed, last_progress(), 0, 0);
                 jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
                 return;
             }
@@ -209,18 +243,26 @@ pub async fn run(
 
         let mut pass2_args: Vec<String> = vec![
             "-y".into(), "-threads".into(), num_cpus(), "-i".into(), input.clone(),
-            "-c:v".into(), codec.into(), "-preset".into(), codec_preset.into(),
-            "-b:v".into(), format!("{video_kbps}k"),
+            "-c:v".into(), codec.into(),
         ];
+        pass2_args.extend(choice.preset_args());
+        pass2_args.extend(["-b:v".into(), format!("{video_kbps}k")]);
         if let Some(ref f) = scale_filter {
             pass2_args.push("-vf".into());
             pass2_args.push(f.clone());
         }
+        // Audio codec and muxer flags come from the same container-aware
+        // choice as the video codec. Hardcoding "aac" here was the second half
+        // of the WebM failure - WebM rejects AAC exactly as it rejects HEVC -
+        // and "+faststart" is an MP4-family flag with no meaning to the WebM
+        // or Matroska muxers.
         pass2_args.extend([
             "-pass".into(), "2".into(), "-passlogfile".into(), passlogfile.clone(),
-            "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
-            "-movflags".into(), "+faststart".into(),
+            "-c:a".into(), choice.audio.into(), "-b:a".into(), "128k".into(),
         ]);
+        if choice.faststart {
+            pass2_args.extend(["-movflags".into(), "+faststart".into()]);
+        }
         pass2_args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
         pass2_args.push(output.clone());
 
@@ -236,7 +278,7 @@ pub async fn run(
                 progress_task.abort();
                 let _ = tokio::fs::remove_file(&progress_file).await;
                 cleanup_passlog_files(&id).await;
-                update(JobStatus::Failed, 0, 0, 0);
+                update(JobStatus::Failed, last_progress(), 0, 0);
                 jobs.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
                 return;
             }
@@ -279,33 +321,96 @@ pub async fn run(
                 args
             };
 
-            match &hw {
-                HwEncoder::Nvenc => with_scale(vec![
+            // The single-pass path had the same container blindness as the
+            // two-pass one: hardcoded H.264 video, AAC audio and a faststart
+            // flag regardless of the output box. NVENC is an extra case of it
+            // - h264_nvenc cannot be muxed into WebM any more than libx265
+            // can - so hardware encoding is used only when the container
+            // actually accepts H.264, and otherwise yields to the software
+            // encoder the container does allow.
+            let choice = codec_for_output(&output);
+            let mut sp: Vec<String> = match &hw {
+                HwEncoder::Nvenc if choice.id == "h264" => vec![
                     "-c:v".into(), "h264_nvenc".into(), "-preset".into(), "p1".into(),
                     "-b:v".into(), format!("{video_kbps}k"),
-                    "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
-                    "-movflags".into(), "+faststart".into(),
-                ]),
+                ],
                 // Reached by MediaKind::ImageStatic target_mb jobs, which
                 // is_two_pass excludes (two-pass only applies to Video and
-                // ImageAnimated). Vaapi and Software fall back to the same
-                // single-pass ultrafast libx264 encode used before two-pass
-                // existed, rather than panicking.
-                HwEncoder::Vaapi | HwEncoder::Software => with_scale(vec![
-                    "-c:v".into(), "libx264".into(), "-preset".into(), "ultrafast".into(),
-                    "-b:v".into(), format!("{video_kbps}k"),
-                    "-c:a".into(), "aac".into(), "-b:a".into(), "128k".into(),
-                    "-movflags".into(), "+faststart".into(),
-                ]),
+                // ImageAnimated), and by any NVENC job whose container cannot
+                // take H.264.
+                _ => {
+                    let mut v: Vec<String> = vec!["-c:v".into(), choice.video.into()];
+                    v.extend(choice.preset_args());
+                    v.extend(["-b:v".into(), format!("{video_kbps}k")]);
+                    v
+                }
+            };
+            sp.extend(["-c:a".into(), choice.audio.into(), "-b:a".into(), "128k".into()]);
+            if choice.faststart {
+                sp.extend(["-movflags".into(), "+faststart".into()]);
             }
+            with_scale(sp)
         } else {
             preset_ffmpeg_args(&preset, &hw).unwrap_or(profile.ffmpeg_args.clone())
+        };
+
+        // Opt-in parallel chunked encode. Any refusal or failure falls through
+        // to the normal serial path below rather than failing the job - a
+        // speed optimisation must never be able to lose someone's output.
+        //
+        // Note this path reports no incremental progress: the -progress file
+        // belongs to a single ffmpeg process and there are several here. The
+        // job still moves Processing -> Done, but the bar does not advance in
+        // between, which is part of why this stays opt-in.
+        let chunk_attempt = match crate::jobs::chunked::applicable(
+            false,
+            profile.duration_secs,
+            profile.kind == MediaKind::Video,
+        ) {
+            Err(reason) => {
+                tracing::debug!("chunked encode skipped: {reason}");
+                None
+            }
+            Ok(()) => {
+                let ext = std::path::Path::new(&output)
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .unwrap_or("mp4")
+                    .to_string();
+                let plan = crate::jobs::chunked::ChunkPlan {
+                    encode_args: ffmpeg_args.clone(),
+                    ext,
+                    chunk_secs: crate::jobs::chunked::default_chunk_secs(),
+                };
+                let dir = crate::state::storage_dir();
+                match crate::jobs::chunked::run(&id, &input, &output, plan, &dir).await {
+                    Ok(()) => {
+                        tracing::info!("chunked encode completed for {id}");
+                        Some(())
+                    }
+                    Err(e) => {
+                        tracing::warn!("chunked encode fell back to serial for {id}: {e}");
+                        None
+                    }
+                }
+            }
         };
 
         let mut args: Vec<String> = vec!["-y".into(), "-threads".into(), num_cpus(), "-i".into(), input];
         args.extend(ffmpeg_args);
         args.extend(["-progress".into(), progress_file.clone(), "-nostats".into()]);
         args.push(output.clone());
+
+        if chunk_attempt.is_some() {
+            // Chunked encode already produced the output file; skip the serial
+            // run entirely and let the shared completion code below pick up
+            // the finished file.
+            Ok(std::process::Output {
+                status: Default::default(),
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+            })
+        } else {
 
         let child = match Command::new("ffmpeg").args(&args)
             .env("OMP_NUM_THREADS", num_cpus())
@@ -314,12 +419,13 @@ pub async fn run(
             Ok(c) => c,
             Err(e) => {
                 tracing::error!("ffmpeg spawn failed: {e}");
-                update(JobStatus::Failed, 0, 0, 0);
+                update(JobStatus::Failed, last_progress(), 0, 0);
                 return;
             }
         };
 
         child.wait_with_output().await
+        }
     };
 
     progress_task.abort();
