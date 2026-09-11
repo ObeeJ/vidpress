@@ -14,7 +14,7 @@ const FAQS = [
     question: "What exactly does theflate do?",
     content: (
       <p className="pf-muted-body">
-        theflate compresses, converts, and transcribes media files: video, audio, and images. Drop a file, pick your output format or preset, and get a smaller file back in seconds. You can also pull video or audio directly from a YouTube, Instagram, TikTok, X, or Facebook link without downloading anything first.
+        theflate compresses, converts, and transcribes media files: video, audio, and images. Drop a file, pick your output format or preset, and choose a target size. Before any work starts you see the resolution and quality that target will actually produce, so a size that is too small cannot quietly turn your video to mush. Larger files take minutes rather than seconds, because making them genuinely small is real work.
       </p>
     ),
   },

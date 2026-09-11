@@ -5,21 +5,19 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import DropZone from "@/components/DropZone";
 import FileCard from "@/components/FileCard";
-import UrlDownloader from "@/components/UrlDownloader";
 import ScreenRecorder from "@/components/ScreenRecorder";
 import LiveStream from "@/components/LiveStream";
 import { useStore } from "@/lib/store";
 
 const TABS = [
   { id: "upload", label: "Upload" },
-  { id: "url",    label: "Social Link" },
   { id: "screen", label: "Screen" },
   { id: "live",   label: "Live" },
 ] as const;
 
 export default function Home() {
   const { files } = useStore();
-  const [activeTab, setActiveTab] = useState<"upload" | "url" | "screen" | "live">("upload");
+  const [activeTab, setActiveTab] = useState<"upload" | "screen" | "live">("upload");
 
   return (
     <div className="page-shell">
@@ -34,7 +32,7 @@ export default function Home() {
           </h1>
 
           <p className="lede">
-            Drop any video, audio, or image. Get a smaller file back in seconds. No account, no limits, no nonsense.
+            Drop any video, audio, or image. See the quality and resolution you&apos;ll actually get before anything is compressed. No account needed.
           </p>
         </div>
 
@@ -61,7 +59,6 @@ export default function Home() {
 
         {/* Processing Component */}
         {activeTab === "upload" && <DropZone />}
-        {activeTab === "url"    && <UrlDownloader />}
         {activeTab === "screen" && <ScreenRecorder />}
         {activeTab === "live"   && <LiveStream />}
 

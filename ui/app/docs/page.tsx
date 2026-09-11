@@ -473,20 +473,6 @@ Body: the raw file bytes`,
     res: `Binary image stream`,
   },
   {
-    category: "ingest",
-    method: "POST",
-    path: "/download-url",
-    auth: "required",
-    title: "Pull from a social link",
-    desc: "Fetches media straight onto the processing server from YouTube, TikTok, Instagram, X or Facebook. Set audio_only to skip the video stream entirely.",
-    req: `{
-  "url": "https://youtu.be/dQw4w9WgXcQ",
-  "audio_only": false,
-  "webhook_url": "https://api.yourapp.com/hooks/theflate"
-}`,
-    res: `{ "job_id": "job_99a8b1c", "status": "queued" }`,
-  },
-  {
     category: "ai",
     method: "POST",
     path: "/transcribe",

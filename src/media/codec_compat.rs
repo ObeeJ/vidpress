@@ -47,10 +47,16 @@ pub struct CodecChoice {
     pub speed: Speed,
 }
 
+// "faster" rather than x264/x265's "medium" default. Preset controls how hard
+// the encoder searches for a smaller encoding, and the curve is steeply
+// diminishing: medium costs roughly twice the CPU of faster for a difference
+// most viewers cannot see. Combined with two-pass - which encodes the whole
+// video once before producing a single frame of output - medium made even
+// short clips take minutes to show any result.
 const H264: CodecChoice = CodecChoice {
     id: "h264",
     video: "libx264",
-    preset: "medium",
+    preset: "faster",
     audio: "aac",
     faststart: true,
     label: "H.264 - fastest, plays everywhere",
@@ -60,7 +66,7 @@ const H264: CodecChoice = CodecChoice {
 const H265: CodecChoice = CodecChoice {
     id: "h265",
     video: "libx265",
-    preset: "medium",
+    preset: "faster",
     audio: "aac",
     faststart: true,
     label: "H.265 - smaller files, modern players",

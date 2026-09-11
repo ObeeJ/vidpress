@@ -67,18 +67,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# yt-dlp_linux, not yt-dlp. The plain `yt-dlp` release asset is a Python zipapp
-# that runs against the *system* interpreter and needs a complete standard
-# library; under --no-install-recommends that stdlib arrives incomplete and
-# yt-dlp dies on imports like `getpass`. yt-dlp_linux bundles its own
-# interpreter, so it depends on nothing in this image and the whole class of
-# missing-module failures disappears along with the python3 package.
-RUN curl -fSL --retry 5 --retry-delay 3 \
-        https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux \
-        -o /usr/local/bin/yt-dlp \
-    && chmod a+rx /usr/local/bin/yt-dlp \
-    && /usr/local/bin/yt-dlp --version
-
 # Copy whisper-cli plus whatever shared objects the build actually produced.
 # The lib directory is empty when the link came out static, which is harmless.
 COPY --from=builder /tmp/whisper-dist/whisper-cli /usr/local/bin/whisper-cli
@@ -95,8 +83,6 @@ RUN set -eux; \
     whisper-cli --help >/dev/null 2>&1 || { \
         echo "FATAL: whisper-cli cannot execute in the runtime image"; \
         ldd /usr/local/bin/whisper-cli || true; exit 1; }; \
-    yt-dlp --version >/dev/null || { \
-        echo "FATAL: yt-dlp cannot execute in the runtime image"; exit 1; }; \
     ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libx265 || { \
         echo "FATAL: ffmpeg lacks libx265"; exit 1; }
 

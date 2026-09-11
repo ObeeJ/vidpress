@@ -15,6 +15,11 @@ export default function ScreenRecorder() {
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Tracks that are not part of the recorded stream and so would otherwise
+  // never be stopped - chiefly the microphone, which keeps the browser's
+  // recording indicator lit until it is released.
+  const extraTracksRef = useRef<MediaStreamTrack[]>([]);
+  const audioCtxRef = useRef<AudioContext | null>(null);
 
   async function startRecording() {
     try {
@@ -22,21 +27,52 @@ export default function ScreenRecorder() {
         video: { frameRate: 30 },
         audio: true,
       });
-      // Try to also capture mic audio and mix it in
+      // Mix whatever audio sources actually exist.
+      //
+      // createMediaStreamSource throws on a stream with no audio track, and
+      // display capture very often has none - Chrome only grants system audio
+      // if the user ticks "Share audio", and Firefox and Safari mostly cannot
+      // provide it at all. The previous version connected the display source
+      // unconditionally inside a try/catch, so that throw skipped the mic
+      // connection too and the fallback recorded no audio whatsoever, even
+      // when the microphone was working perfectly. Each source is now checked
+      // before it is connected.
       let stream = display;
       try {
-        const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const ctx = new AudioContext();
-        const dest = ctx.createMediaStreamDestination();
-        ctx.createMediaStreamSource(display).connect(dest);
-        ctx.createMediaStreamSource(mic).connect(dest);
-        const mixed = new MediaStream([
-          ...display.getVideoTracks(),
-          ...dest.stream.getAudioTracks(),
-        ]);
-        stream = mixed;
-      } catch {
-        // mic unavailable - screen audio only
+        const mic = await navigator.mediaDevices
+          .getUserMedia({ audio: true })
+          .catch(() => null);
+        const displayHasAudio = display.getAudioTracks().length > 0;
+
+        if (mic || displayHasAudio) {
+          const ctx = new AudioContext();
+          // An AudioContext can start suspended under autoplay policies, in
+          // which case no samples flow and the recording comes out silent.
+          if (ctx.state === "suspended") await ctx.resume();
+
+          const dest = ctx.createMediaStreamDestination();
+          if (displayHasAudio) ctx.createMediaStreamSource(display).connect(dest);
+          if (mic) ctx.createMediaStreamSource(mic).connect(dest);
+
+          stream = new MediaStream([
+            ...display.getVideoTracks(),
+            ...dest.stream.getAudioTracks(),
+          ]);
+
+          // Kept so stopRecording can release them. Mic tracks are not part of
+          // `stream`, so stopping `stream` alone leaves the microphone live and
+          // the browser's recording indicator lit after the user has stopped.
+          extraTracksRef.current = [
+            ...(mic ? mic.getTracks() : []),
+            ...display.getAudioTracks(),
+          ];
+          audioCtxRef.current = ctx;
+        }
+      } catch (e) {
+        // Genuinely unexpected - fall back to video only rather than failing
+        // the recording, but do not pretend this is the ordinary
+        // no-microphone case the way the previous comment did.
+        console.warn("audio mixing failed, recording video only", e);
       }
 
       chunksRef.current = [];
@@ -69,6 +105,13 @@ export default function ScreenRecorder() {
 
   async function finalise(stream: MediaStream) {
     stream.getTracks().forEach((t) => t.stop());
+    // Release the sources that never reached the recorded stream. Without this
+    // the microphone stays open and the browser keeps showing a recording
+    // indicator long after the user has stopped.
+    extraTracksRef.current.forEach((t) => t.stop());
+    extraTracksRef.current = [];
+    audioCtxRef.current?.close().catch(() => {});
+    audioCtxRef.current = null;
     const blob = new Blob(chunksRef.current, { type: "video/webm" });
     const file = new File([blob], `screen_${Date.now()}.webm`, { type: "video/webm" });
     const localUrl = URL.createObjectURL(file);
