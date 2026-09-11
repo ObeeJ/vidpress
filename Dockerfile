@@ -87,8 +87,23 @@ RUN set -eux; \
         echo "FATAL: ffmpeg lacks libx265"; exit 1; }
 
 # Bake GGML whisper base model (~140MB)
+# --http1.1 is load-bearing. Over HTTP/2 this 140MB transfer intermittently
+# dies with curl exit 92 (a framing-layer stream error), and --retry does not
+# cover that class of failure, so the whole image build fails on a bad network
+# day. Forcing HTTP/1.1 sidesteps the stream handling entirely.
+#
+# --retry-all-errors makes the retries actually apply to transport failures
+# rather than only to HTTP status codes.
+#
+# The size check catches the other failure mode: a truncated or error-page
+# download that still exits zero would otherwise be baked into the image and
+# only surface when a user requests a transcription.
 RUN mkdir -p /app/models \
-    && curl -fSL --retry 10 --retry-delay 3 https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin -o /app/models/ggml-base.bin
+    && curl -fSL --http1.1 --retry 10 --retry-delay 3 --retry-all-errors \
+        https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin \
+        -o /app/models/ggml-base.bin \
+    && [ "$(stat -c%s /app/models/ggml-base.bin)" -gt 100000000 ] \
+        || { echo "FATAL: whisper model download was truncated"; exit 1; }
 
 WORKDIR /app
 COPY --from=builder /app/target/release/theflate /usr/local/bin/theflate
