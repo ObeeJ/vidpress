@@ -4,6 +4,21 @@ use crate::jobs::model::{Job, JobStatus};
 use crate::media::detect::MediaKind;
 
 pub fn init_db(conn: &Connection) {
+    // WAL lets readers (a backup script, `sqlite3` for manual inspection, a
+    // future second connection) proceed without blocking on - or being
+    // blocked by - this process's writes; the default rollback-journal mode
+    // takes an exclusive lock for the duration of every write transaction.
+    // busy_timeout makes SQLITE_BUSY from any such contention retry for up
+    // to 5s instead of failing the request immediately. synchronous=NORMAL
+    // is the setting SQLite's own documentation pairs with WAL: WAL's
+    // checkpoint already fsyncs the log, so FULL's extra fsync on every
+    // commit buys no additional durability there, only latency.
+    conn.execute_batch("
+        PRAGMA journal_mode = WAL;
+        PRAGMA busy_timeout = 5000;
+        PRAGMA synchronous = NORMAL;
+    ").expect("failed to set db pragmas");
+
     conn.execute_batch("
         CREATE TABLE IF NOT EXISTS jobs (
             id TEXT PRIMARY KEY,
