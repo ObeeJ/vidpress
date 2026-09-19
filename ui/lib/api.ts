@@ -10,6 +10,24 @@ function headers(extra?: Record<string, string>): Record<string, string> {
   };
 }
 
+/** Every backend error handler returns `{"error": "<msg>"}` (src/handlers/*.rs
+ *  - see analyze.rs::json_err, transcribe.rs, ingest.rs, jobs.rs, preview.rs,
+ *  keys.rs). Throwing `new Error(await r.text())` directly, as every function
+ *  below used to, makes `Error.message` the literal JSON string - the UI has
+ *  shown users things like `{"error":"unsupported file type"}` verbatim.
+ *  This extracts the actual message, falling back to the raw body only if it
+ *  is not the expected shape (e.g. a proxy's HTML error page). */
+function parseApiError(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.error === "string" && parsed.error !== "target_too_small") return parsed.error;
+    if (typeof parsed?.message === "string" && parsed.message) return parsed.message;
+  } catch {
+    // Not JSON - fall through to the raw body.
+  }
+  return raw;
+}
+
 export async function ingestFile(file: File, onProgress?: (pct: number) => void): Promise<string> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -24,7 +42,7 @@ export async function ingestFile(file: File, onProgress?: (pct: number) => void)
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve(JSON.parse(xhr.responseText).ingest_id);
       } else {
-        reject(new Error(xhr.responseText));
+        reject(new Error(parseApiError(xhr.responseText)));
       }
     };
     xhr.onerror = () => reject(new Error("Upload failed"));
@@ -38,7 +56,7 @@ export async function analyzeFile(ingestId: string) {
     headers: headers({ "content-type": "application/json" }),
     body: JSON.stringify({ ingest_id: ingestId }),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(parseApiError(await r.text()));
   return r.json();
 }
 
@@ -138,7 +156,7 @@ export async function uploadFile(
     } catch {
       // Not JSON; fall through to the raw body below.
     }
-    throw typed ?? new Error(raw);
+    throw typed ?? new Error(parseApiError(raw));
   }
   return r.json();
 }
@@ -160,7 +178,7 @@ export function downloadFile(id: string, filename: string) {
 
 export async function getJob(id: string) {
   const r = await fetch(`${API}/jobs/${id}`, { headers: headers() });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(parseApiError(await r.text()));
   return r.json();
 }
 
@@ -170,13 +188,13 @@ export async function transcribeFile(jobId: string) {
     headers: headers({ "content-type": "application/json" }),
     body: JSON.stringify({ job_id: jobId }),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(parseApiError(await r.text()));
   return r.json();
 }
 
 export async function getTranscription(id: string) {
   const r = await fetch(`${API}/transcriptions/${id}`, { headers: headers() });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(parseApiError(await r.text()));
   return r.json();
 }
 
@@ -214,6 +232,6 @@ export async function exportToDestination(
       },
     }),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(parseApiError(await r.text()));
   return r.json();
 }
