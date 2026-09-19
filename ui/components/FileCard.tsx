@@ -526,7 +526,22 @@ export default function FileCard({ item }: { item: FileItem }) {
                 </span>
                 <span className="fc-stat-label">Compressed</span>
               </div>
-              {stat("Saved", `${(((job.original_bytes - job.compressed_bytes) / job.original_bytes) * 100).toFixed(1)}%`, "var(--color-signal)")}
+              {(() => {
+                // A negative value here means the "compressed" output is
+                // actually larger than the source (e.g. a codec/container
+                // change that isn't a net win for this file). Always
+                // labeling it "Saved" and coloring it with the success
+                // color misrepresented a regression as a win - seen live as
+                // "-28.3%" shown in green.
+                const savedPct = job.original_bytes > 0
+                  ? ((job.original_bytes - job.compressed_bytes) / job.original_bytes) * 100
+                  : 0;
+                return stat(
+                  savedPct >= 0 ? "Saved" : "Larger",
+                  `${Math.abs(savedPct).toFixed(1)}%`,
+                  savedPct >= 0 ? "var(--color-signal)" : "var(--color-danger)",
+                );
+              })()}
             </div>
 
             {/* Media Preview */}
