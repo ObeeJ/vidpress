@@ -7,11 +7,17 @@ import { toast, toastError } from "@/lib/toast";
 import Button from "@/components/primitives/Button";
 
 type RecordState = "idle" | "recording" | "processing";
+type AudioSource = "system" | "mic" | "both";
 
 export default function ScreenRecorder() {
   const { addFileWithUrl, setIngestId, setProfile, setError } = useStore();
   const [state, setState] = useState<RecordState>("idle");
   const [elapsed, setElapsed] = useState(0);
+  // Default to system audio: this is what users mean by "screen recording"
+  // sound (app/video/game/tab audio), not their own mic. Mixing the mic in
+  // by default was recording narration or room noise that nobody asked for
+  // and, on top of that, degraded the system audio itself (see below).
+  const [audioSource, setAudioSource] = useState<AudioSource>("system");
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -23,26 +29,51 @@ export default function ScreenRecorder() {
 
   async function startRecording() {
     try {
+      const wantSystem = audioSource === "system" || audioSource === "both";
+      const wantMic = audioSource === "mic" || audioSource === "both";
+
+      // Requesting `audio: true` (a bare boolean) makes Chrome apply its
+      // voice-call audio pipeline - echo cancellation, automatic gain
+      // control, noise suppression - to whatever comes back, including tab
+      // and system audio that was never a voice call and has nothing for
+      // AEC to cancel against. That processing is the documented cause of
+      // getDisplayMedia audio sounding crushed/muffled compared to the
+      // source. Explicit constraints turn it off for system audio; the mic
+      // keeps it since it does help a real microphone.
       const display = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 30 },
-        audio: true,
+        audio: wantSystem
+          ? { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+          : false,
       });
-      // Mix whatever audio sources actually exist.
-      //
-      // createMediaStreamSource throws on a stream with no audio track, and
-      // display capture very often has none - Chrome only grants system audio
-      // if the user ticks "Share audio", and Firefox and Safari mostly cannot
-      // provide it at all. The previous version connected the display source
-      // unconditionally inside a try/catch, so that throw skipped the mic
-      // connection too and the fallback recorded no audio whatsoever, even
-      // when the microphone was working perfectly. Each source is now checked
-      // before it is connected.
+
+      const displayHasAudio = display.getAudioTracks().length > 0;
+      if (wantSystem && !displayHasAudio) {
+        toast(
+          audioSource === "system"
+            ? "No system audio was shared - tick \"Share audio\" in the browser's screen-share dialog, or switch to Microphone."
+            : "No system audio was shared - recording microphone only. Tick \"Share audio\" next time to include it.",
+          "info",
+        );
+      }
+
       let stream = display;
       try {
-        const mic = await navigator.mediaDevices
-          .getUserMedia({ audio: true })
-          .catch(() => null);
-        const displayHasAudio = display.getAudioTracks().length > 0;
+        const mic = wantMic
+          ? await navigator.mediaDevices
+              .getUserMedia({
+                audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+              })
+              .catch(() => null)
+          : null;
+
+        if (wantMic && !mic) {
+          toast(
+            "Microphone access was denied or unavailable" +
+              (displayHasAudio ? " - recording system audio only." : " - recording video only."),
+            "info",
+          );
+        }
 
         if (mic || displayHasAudio) {
           const ctx = new AudioContext();
@@ -149,6 +180,28 @@ export default function ScreenRecorder() {
         )}
       </div>
 
+      {state === "idle" && (
+        <div className="ud-input-row" role="radiogroup" aria-label="Audio source">
+          {([
+            ["system", "System audio"],
+            ["mic", "Microphone"],
+            ["both", "Both"],
+          ] as [AudioSource, string][]).map(([value, label]) => (
+            <label key={value} className="ud-checkbox-label">
+              <input
+                type="radio"
+                name="audio-source"
+                className="ud-checkbox"
+                value={value}
+                checked={audioSource === value}
+                onChange={() => setAudioSource(value)}
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      )}
+
       <div className="ud-input-row">
         {state === "idle" && (
           <Button variant="primary" onClick={startRecording} className="fc-btn-full">Start Recording</Button>
@@ -162,7 +215,9 @@ export default function ScreenRecorder() {
       </div>
 
       <div className="ud-hint">
-        Browser will prompt you to choose a screen, window, or tab. Microphone audio is included if permitted.
+        {audioSource === "system" && "Tick \"Share audio\" in the browser's screen-share dialog to capture system sound."}
+        {audioSource === "mic" && "Records your microphone only, not screen/system sound."}
+        {audioSource === "both" && "Tick \"Share audio\" in the screen-share dialog; mixes system sound with your microphone."}
       </div>
     </div>
   );
