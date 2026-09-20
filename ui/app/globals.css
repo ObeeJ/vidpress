@@ -958,6 +958,16 @@ p { text-wrap: pretty; }
   word-break: break-all;
 }
 
+.fc-export-error {
+  font-size: var(--text-2xs);
+  color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-sm);
+  word-break: break-word;
+}
+
 .fc-media-frame {
   border-radius: var(--radius-md);
   overflow: hidden;

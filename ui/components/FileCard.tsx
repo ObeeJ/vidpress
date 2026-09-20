@@ -101,6 +101,11 @@ export default function FileCard({ item }: { item: FileItem }) {
   const [tooSmall, setTooSmall] = useState<TargetTooSmallError | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportedUrl, setExportedUrl] = useState<string | null>(null);
+  // A failed export only ever surfaced as a toast, which auto-dismisses
+  // after 5s - miss it and there was no way to tell the transfer didn't
+  // happen, unlike every other failure path in this component (see
+  // item.error below), which also leaves a persistent message.
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollFailsRef = useRef(0);
@@ -239,6 +244,7 @@ export default function FileCard({ item }: { item: FileItem }) {
     }
 
     setExporting(true);
+    setExportError(null);
     try {
       const res = await exportToDestination(job.id, exportProvider, {
         bucket: exportBucket.trim(),
@@ -253,7 +259,10 @@ export default function FileCard({ item }: { item: FileItem }) {
       setExportSecretKey("");
       toast(`Exported to ${exportProvider.toUpperCase()}`, "success");
     } catch (e) {
-      toastError(e, "Export failed. Check the bucket name and credentials.");
+      const fallback = "Export failed. Check the bucket name and credentials.";
+      const msg = e instanceof Error && e.message.length < 120 ? e.message.replace(/^Error:\s*/i, "") : fallback;
+      setExportError(msg);
+      toastError(e, fallback);
     } finally {
       setExporting(false);
     }
@@ -658,6 +667,9 @@ export default function FileCard({ item }: { item: FileItem }) {
                     <div className="fc-export-success">
                       Successfully exported: <a href={exportedUrl} target="_blank" rel="noreferrer" className="fc-export-link">{exportedUrl}</a>
                     </div>
+                  )}
+                  {exportError && (
+                    <div className="fc-export-error">{exportError}</div>
                   )}
                 </div>
               )}
