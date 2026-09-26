@@ -10,6 +10,34 @@ function headers(extra?: Record<string, string>): Record<string, string> {
   };
 }
 
+/** Every backend error handler returns `{"error": "<msg>"}` (src/handlers/*.rs
+ *  - see analyze.rs::json_err, transcribe.rs, ingest.rs, jobs.rs, preview.rs,
+ *  keys.rs), except the target_too_small refusal, which uses `.error` as a
+ *  discriminator and carries the actual text in `.message` alongside it.
+ *  Pulled out so uploadFile() (which needs the parsed object anyway, to also
+ *  check for target_too_small) can reuse this without re-parsing the same
+ *  JSON string a second time. */
+function extractErrorMessage(parsed: unknown): string | null {
+  const obj = parsed as { error?: unknown; message?: unknown } | null;
+  if (typeof obj?.error === "string" && obj.error !== "target_too_small") return obj.error;
+  if (typeof obj?.message === "string" && obj.message) return obj.message;
+  return null;
+}
+
+/** Throwing `new Error(await r.text())` directly, as every function below
+ *  used to, makes `Error.message` the literal JSON string - the UI has shown
+ *  users things like `{"error":"unsupported file type"}` verbatim. This
+ *  extracts the actual message, falling back to the raw body only if it is
+ *  not the expected shape (e.g. a proxy's HTML error page) or genuinely has
+ *  no message to extract. */
+function parseApiError(raw: string): string {
+  try {
+    return extractErrorMessage(JSON.parse(raw)) ?? raw;
+  } catch {
+    return raw;
+  }
+}
+
 export async function ingestFile(file: File, onProgress?: (pct: number) => void): Promise<string> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -24,7 +52,7 @@ export async function ingestFile(file: File, onProgress?: (pct: number) => void)
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve(JSON.parse(xhr.responseText).ingest_id);
       } else {
-        reject(new Error(xhr.responseText));
+        reject(new Error(parseApiError(xhr.responseText)));
       }
     };
     xhr.onerror = () => reject(new Error("Upload failed"));
@@ -38,7 +66,7 @@ export async function analyzeFile(ingestId: string) {
     headers: headers({ "content-type": "application/json" }),
     body: JSON.stringify({ ingest_id: ingestId }),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(parseApiError(await r.text()));
   return r.json();
 }
 
@@ -129,11 +157,12 @@ export async function uploadFile(
     // swallowed into a misleading message.
     let typed: Error | null = null;
     try {
-      const parsed = JSON.parse(raw);
+      const parsed = JSON.parse(raw) as { error?: unknown } | null;
       if (parsed?.error === "target_too_small") {
-        typed = new TargetTooSmallError(parsed);
-      } else if (typeof parsed?.message === "string") {
-        typed = new Error(parsed.message);
+        typed = new TargetTooSmallError(parsed as ConstructorParameters<typeof TargetTooSmallError>[0]);
+      } else {
+        const msg = extractErrorMessage(parsed);
+        if (msg) typed = new Error(msg);
       }
     } catch {
       // Not JSON; fall through to the raw body below.
@@ -160,7 +189,7 @@ export function downloadFile(id: string, filename: string) {
 
 export async function getJob(id: string) {
   const r = await fetch(`${API}/jobs/${id}`, { headers: headers() });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(parseApiError(await r.text()));
   return r.json();
 }
 
@@ -170,13 +199,13 @@ export async function transcribeFile(jobId: string) {
     headers: headers({ "content-type": "application/json" }),
     body: JSON.stringify({ job_id: jobId }),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(parseApiError(await r.text()));
   return r.json();
 }
 
 export async function getTranscription(id: string) {
   const r = await fetch(`${API}/transcriptions/${id}`, { headers: headers() });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(parseApiError(await r.text()));
   return r.json();
 }
 
@@ -214,6 +243,6 @@ export async function exportToDestination(
       },
     }),
   });
-  if (!r.ok) throw new Error(await r.text());
+  if (!r.ok) throw new Error(parseApiError(await r.text()));
   return r.json();
 }
