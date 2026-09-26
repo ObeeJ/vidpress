@@ -48,6 +48,20 @@ const AUDIO_KBPS: f64 = 128.0;
 /// carried through when known - this only keeps the estimate defined.
 pub const ASSUMED_FPS: f64 = 30.0;
 
+/// Formats a megabyte figure for the warning text below. `{:.0}` alone
+/// rounds anything under 0.5 MB down to the literal string "0" - for a short
+/// voice memo, a small GIF, or the tiny `estimated_output_mb` the UI defaults
+/// to before a user picks a target, that produced self-contradictory advice
+/// like "0 MB would keep it sharp." Sub-1 MB values get two decimal places
+/// instead. `min_recommended_mb` is always positive (it is derived from a
+/// fixed acceptable-quality bitrate, never from the caller's input), but
+/// `target_mb` is whatever the caller passed and can legitimately be 0 or
+/// negative; this only fixes the misleading rounding, it does not make a
+/// literal 0 MB target read as sensible advice.
+fn fmt_mb(mb: f64) -> String {
+    if mb < 1.0 { format!("{mb:.2}") } else { format!("{mb:.0}") }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum QualityTier {
@@ -157,19 +171,27 @@ pub fn estimate(
 
     let warning = match tier {
         QualityTier::Good | QualityTier::Acceptable => None,
-        QualityTier::Poor => Some(format!(
-            "{target_mb:.0} MB gives about {video_kbps:.0} kbps, which is low for \
-             {w}x{h}. The video will be downscaled to about {output_height}p and \
-             will look noticeably soft. Around {min_recommended_mb:.0} MB would \
-             keep it sharp."
-        )),
-        QualityTier::Unusable => Some(format!(
-            "{target_mb:.0} MB for a {duration:.0} second {w}x{h} video is about \
-             {video_kbps:.0} kbps. That forces a downscale to roughly \
-             {output_height}p and the result will be blocky and hard to watch. \
-             Around {min_recommended_mb:.0} MB is the realistic minimum for this \
-             video."
-        )),
+        QualityTier::Poor => {
+            let target_mb_s = fmt_mb(target_mb);
+            let min_recommended_mb_s = fmt_mb(min_recommended_mb);
+            Some(format!(
+                "{target_mb_s} MB gives about {video_kbps:.0} kbps, which is low for \
+                 {w}x{h}. The video will be downscaled to about {output_height}p and \
+                 will look noticeably soft. Around {min_recommended_mb_s} MB would \
+                 keep it sharp."
+            ))
+        }
+        QualityTier::Unusable => {
+            let target_mb_s = fmt_mb(target_mb);
+            let min_recommended_mb_s = fmt_mb(min_recommended_mb);
+            Some(format!(
+                "{target_mb_s} MB for a {duration:.0} second {w}x{h} video is about \
+                 {video_kbps:.0} kbps. That forces a downscale to roughly \
+                 {output_height}p and the result will be blocky and hard to watch. \
+                 Around {min_recommended_mb_s} MB is the realistic minimum for this \
+                 video."
+            ))
+        }
     };
 
     QualityEstimate {
@@ -208,6 +230,23 @@ mod tests {
         // The recommendation must be meaningfully larger than the ask, or it
         // is not useful advice.
         assert!(e.min_recommended_mb > 3.0);
+    }
+
+    /// Reproduces a live bug: a small source (120.6 KB, 640x360) analyzed
+    /// with the UI's default target - `estimated_output_mb`, which for a
+    /// file this size is a few hundredths of a MB - produced the warning
+    /// "0 MB gives about 100 kbps... Around 0 MB would keep it sharp."
+    /// `{:.0}` formatting rounded both sub-1-MB figures down to the literal
+    /// string "0", making the advice self-contradictory.
+    #[test]
+    fn small_targets_do_not_render_as_a_literal_zero() {
+        let e = estimate(0.0177, 8.0, Some(640), Some(360), Some(30.0));
+        assert!(e.tier.should_block() || matches!(e.tier, QualityTier::Poor));
+        let warning = e.warning.expect("a target this small must warn");
+        assert!(
+            !warning.contains("0 MB"),
+            "warning still renders a sub-1-MB figure as a literal zero: {warning}"
+        );
     }
 
     #[test]
